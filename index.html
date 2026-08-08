@@ -731,12 +731,24 @@ document.querySelectorAll('.filters .clearf').forEach(btn=>{ btn.addEventListene
 const chipsEl=document.getElementById('quick-chips');
 QUICK.forEach(name=>{ const c=document.createElement('button');c.className='chip';c.textContent=name;
   c.addEventListener('click',()=>{document.getElementById('q').value=name;search();}); chipsEl.appendChild(c); });
-document.getElementById('surprise').addEventListener('click',()=>{
-  const pick=CATALOG[Math.floor(Math.random()*CATALOG.length)];
+document.getElementById('surprise').addEventListener('click',async ()=>{
   document.querySelector('.tab[data-panel=buscar]').click();
+  if(LIVE){
+    const seed=PACK_SEEDS[Math.floor(Math.random()*PACK_SEEDS.length)];
+    try{ const r=await fetch(API+'/cards?name='+seed);
+      if(r.ok){ const d=await r.json();
+        if(Array.isArray(d)&&d.length){
+          const brief=d[Math.floor(Math.random()*d.length)];
+          const card=briefToCard(brief);
+          document.getElementById('q').value=card.name; search();
+          setTimeout(()=>openDetail(card),700); return;
+        } } }catch(e){}
+  }
+  const pick=CATALOG[Math.floor(Math.random()*CATALOG.length)];
   document.getElementById('q').value=pick.name.split(' ')[0]; search();
   setTimeout(()=>openDetail(pick),700);
 });
+
 
 const resultsEl=document.getElementById('results');
 function localSearch(q){ const s=q.toLowerCase(); return CATALOG.filter(c=>c.name.toLowerCase().includes(s)); }
