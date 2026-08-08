@@ -1,4 +1,4 @@
-# 🎴 Alonso's Night Searcher
+  # 🎴 Alonso's TGC Searcher
 
 App web para coleccionar cartas Pokémon TCG. Busca cartas con precios reales
 (convertidos a soles), arma tu colección, organiza regalos, y de noche: abre
