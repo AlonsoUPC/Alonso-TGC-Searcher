@@ -664,7 +664,7 @@ document.querySelectorAll('.tab').forEach(t=>{ t.addEventListener('click',()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
   t.classList.add('active'); document.getElementById('p-'+t.dataset.panel).classList.add('active');
-  if(t.dataset.panel==='coleccion')renderMine(); if(t.dataset.panel==='regalos')renderGift(); if(t.dataset.panel==='presupuesto')renderBudget();
+if(t.dataset.panel==='abrir')renderPackStats(); if(t.dataset.panel==='progreso')renderProgreso();==='coleccion')renderMine(); if(t.dataset.panel==='regalos')renderGift(); if(t.dataset.panel==='presupuesto')renderBudget();
   if(t.dataset.panel==='comparar')initCompare(); if(t.dataset.panel==='binder')renderBinder();
   if(t.dataset.panel==='abrir')renderPackStats(); if(t.dataset.panel==='progreso')renderProgreso();
 }); });
@@ -1215,7 +1215,127 @@ function renderProgreso(){
   let rt; addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(draw,200); });
   draw();
 })();
+// ===== WIKI de mecánicas (evolución, habilidades, movimientos) =====
+const WIKI_QUICK=["Charizard","Pikachu","Gengar","Greninja","Sylveon","Dragonite"];
+const wikiCache={};
 
+// Trae la descripción en español (con respaldo a inglés) de una habilidad o movimiento
+function esText(entries, key){
+  const arr = entries || [];
+  const es = arr.filter(e => e.language && e.language.name === 'es');
+  const en = arr.filter(e => e.language && e.language.name === 'en');
+  const pick = (es[es.length-1] || es[0] || en[en.length-1] || en[0]);
+  if(!pick) return '';
+  return (pick[key]||'').replace(/[\n\f\r]+/g,' ').replace(/\s+/g,' ').trim();
+}
+function esName(names){
+  const arr = names || [];
+  const es = arr.find(n => n.language && n.language.name === 'es');
+  const en = arr.find(n => n.language && n.language.name === 'en');
+  return (es && es.name) || (en && en.name) || '';
+}
+
+async function fetchWiki(name){
+  const slugs = pokeSlugs(name); if(!slugs.length) return null;
+  const key = slugs[0];
+  if(wikiCache[key] !== undefined) return wikiCache[key];
+  if(!LIVE){ wikiCache[key]=null; return null; }
+  let p=null;
+  for(const slug of slugs){ try{ const r=await fetch(POKEAPI+'/pokemon/'+slug); if(r.ok){ p=await r.json(); break; } }catch(e){} }
+  if(!p){ wikiCache[key]=null; return null; }
+  const out = { id:p.id, name:p.name, types:(p.types||[]).map(t=>t.type.name),
+    sprite:(p.sprites&&p.sprites.front_default)||null, abilities:[], moves:[], evo:[] };
+  // Habilidades (con descripción es)
+  try{
+    out.abilities = await Promise.all((p.abilities||[]).map(async a=>{
+      const info={ slug:a.ability.name, hidden:a.is_hidden, name:a.ability.name, desc:'' };
+      try{ const r=await fetch(a.ability.url); if(r.ok){ const d=await r.json();
+        info.name = esName(d.names) || info.name;
+        info.desc = esText(d.flavor_text_entries,'flavor_text') || esText(d.effect_entries,'short_effect'); } }catch(e){}
+      return info;
+    }));
+  }catch(e){}
+  // Movimientos (todos) — traducimos nombre y datos base
+  try{
+    out.moves = await Promise.all((p.moves||[]).map(async m=>{
+      const info={ slug:m.move.name, name:m.move.name, type:'', power:null, accuracy:null, pp:null };
+      try{ const r=await fetch(m.move.url); if(r.ok){ const d=await r.json();
+        info.name = esName(d.names) || info.name;
+        info.type = (d.type && d.type.name) || ''; info.power=d.power; info.accuracy=d.accuracy; info.pp=d.pp; } }catch(e){}
+      return info;
+    }));
+    out.moves.sort((a,b)=>(b.power||0)-(a.power||0));
+  }catch(e){}
+  // Cadena evolutiva
+  try{
+    const rs=await fetch(POKEAPI+'/pokemon-species/'+p.id);
+    if(rs.ok){ const sp=await rs.json();
+      if(sp.evolution_chain && sp.evolution_chain.url){
+        const re=await fetch(sp.evolution_chain.url);
+        if(re.ok){ const ec=await re.json();
+          const walk=(node)=>{ if(!node)return;
+            const dexId=(node.species.url.match(/\/(\d+)\/?$/)||[])[1];
+            let cond='';
+            const det=(node.evolution_details||[])[0];
+            if(det){ if(det.min_level)cond='Nv. '+det.min_level;
+              else if(det.item)cond=det.item.name.replace(/-/g,' ');
+              else if(det.trigger)cond=det.trigger.name.replace(/-/g,' '); }
+            out.evo.push({ name:node.species.name, id:dexId,
+              sprite:'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/'+dexId+'.png', cond });
+            (node.evolves_to||[]).forEach(walk);
+          };
+          walk(ec.chain);
+        }
+      }
+    }
+  }catch(e){}
+  wikiCache[key]=out; return out;
+}
+
+const MVTYPE_COLOR={normal:'#a8a878',fire:'#f08030',water:'#6890f0',electric:'#f8d030',grass:'#78c850',ice:'#98d8d8',fighting:'#c03028',poison:'#a040a0',ground:'#e0c068',flying:'#a890f0',psychic:'#f85888',bug:'#a8b820',rock:'#b8a038',ghost:'#705898',dragon:'#7038f8',dark:'#705848',steel:'#b8b8d0',fairy:'#ee99ac'};
+
+async function renderWiki(name){
+  const box=document.getElementById('wiki-content');
+  if(!LIVE){ box.innerHTML='<div class="empty">La wiki necesita conexión en vivo. Ábrela fuera de Dia.</div>'; return; }
+  box.innerHTML='<div class="loading"><div class="spinner"></div>Cargando '+name+'…</div>';
+  const w=await fetchWiki(name);
+  if(!w){ box.innerHTML='<div class="empty">No encontré datos de "'+name+'". Prueba con el nombre en inglés.</div>'; return; }
+  // Evolución
+  let evoHTML='';
+  if(w.evo.length>1){
+    evoHTML='<div class="wiki-block"><h3>🧬 Cadena evolutiva</h3><div class="evo-chain">'+
+      w.evo.map((e,i)=>(i>0?'<span class="evo-arrow">→'+(e.cond?'<div class="evo-cond">'+e.cond+'</div>':'')+'</span>':'')+
+        '<div class="evo-stage" data-poke="'+e.name+'"><img src="'+e.sprite+'" alt="'+e.name+'"><div class="en">'+e.name+'</div></div>').join('')+
+      '</div></div>';
+  }
+  // Habilidades
+  const abHTML='<div class="wiki-block"><h3>⚡ Habilidades</h3>'+
+    (w.abilities.length? w.abilities.map(a=>'<div class="wiki-ability"><b>'+a.name+'</b>'+(a.hidden?' <span style="font-size:0.65rem;color:var(--muted)">(oculta)</span>':'')+
+      (a.desc?'<div class="desc">'+a.desc+'</div>':'')+'</div>').join('') : '<div class="desc">Sin datos.</div>')+'</div>';
+  // Movimientos
+  const mvRows=w.moves.map(m=>{ const col=MVTYPE_COLOR[m.type]||'#777'; const tEs=PKTYPE_ES[m.type]||m.type||'—';
+    return '<tr><td>'+m.name+'</td><td><span class="mv-type" style="background:'+col+'">'+tEs+'</span></td>'+
+      '<td>'+(m.power!=null?m.power:'—')+'</td><td>'+(m.accuracy!=null?m.accuracy+'%':'—')+'</td><td>'+(m.pp!=null?m.pp:'—')+'</td></tr>'; }).join('');
+  const mvHTML='<div class="wiki-block"><h3>🥊 Movimientos <span style="font-size:0.7rem;color:var(--muted);font-weight:normal">· '+w.moves.length+' totales</span></h3>'+
+    '<div style="overflow-x:auto"><table class="wiki-moves"><thead><tr><th>Movimiento</th><th>Tipo</th><th>Potencia</th><th>Precisión</th><th>PP</th></tr></thead><tbody>'+mvRows+'</tbody></table></div></div>';
+
+  box.innerHTML=evoHTML+abHTML+mvHTML;
+  box.querySelectorAll('.evo-stage').forEach(el=>el.addEventListener('click',()=>{
+    document.getElementById('wiki-q').value=el.dataset.poke; renderWiki(el.dataset.poke);
+  }));
+}
+
+// Chips rápidos + buscador de la wiki
+(function initWiki(){
+  const chips=document.getElementById('wiki-chips');
+  if(chips){ WIKI_QUICK.forEach(n=>{ const b=document.createElement('button'); b.className='chip'; b.textContent=n;
+    b.addEventListener('click',()=>{ document.getElementById('wiki-q').value=n; renderWiki(n); }); chips.appendChild(b); }); }
+  const q=document.getElementById('wiki-q');
+  if(q){ let t=null;
+    q.addEventListener('input',e=>{ clearTimeout(t); const v=e.target.value.trim(); if(v.length<3)return; t=setTimeout(()=>renderWiki(v),500); });
+    q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ clearTimeout(t); const v=e.target.value.trim(); if(v)renderWiki(v); } });
+  }
+})();
 refreshStats(); paintBanner();
 probe().then(()=>{ Object.values(store.get()).forEach(c=>fetchPrice(c.id,c.name).then(refreshStats)); });
 </script>
