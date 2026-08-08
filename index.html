@@ -349,6 +349,7 @@
       <button class="tab night-only" data-panel="comparar">⚖️ Comparar</button>
       <button class="tab night-only" data-panel="binder">📔 Binder</button>
       <button class="tab night-only" data-panel="progreso">📊 Progreso</button>
+      <button class="tab night-only" data-panel="wiki">📖 Wiki</button>
     </div>
   </header>
 
@@ -542,6 +543,16 @@
     <div class="wish-note"><b>Wishlist:</b> marca cartas que quieres con 💙 al buscarlas. Aquí ves cuánto costaría completarla.</div>
     <div class="grid" id="wish-grid"><div class="empty">Tu wishlist está vacía. Busca cartas y toca 💙 Deseada.</div></div>
   </section>
+  
+  <!-- WIKI (noche) -->
+  <section class="panel" id="p-wiki">
+    <div class="col-head"><h2>📖 Wiki de mecánicas</h2></div>
+    <div class="search-bar" style="margin-bottom:10px">
+      <input id="wiki-q" type="text" placeholder="Busca un Pokémon para ver evolución, habilidades y movimientos…" autocomplete="off">
+    </div>
+    <div class="chips" id="wiki-chips"></div>
+    <div id="wiki-content"><div class="empty">Escribe un nombre o toca un Pokémon 👆</div></div>
+  </section>
 
   <footer class="foot">
     Datos e imágenes: <a href="https://tcgdex.dev/es" target="_blank">TCGdex API</a> · precios de TCGplayer (USD) y Cardmarket (EUR) convertidos a soles.<br>
@@ -664,7 +675,7 @@ document.querySelectorAll('.tab').forEach(t=>{ t.addEventListener('click',()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
   t.classList.add('active'); document.getElementById('p-'+t.dataset.panel).classList.add('active');
-if(t.dataset.panel==='abrir')renderPackStats(); if(t.dataset.panel==='progreso')renderProgreso();==='coleccion')renderMine(); if(t.dataset.panel==='regalos')renderGift(); if(t.dataset.panel==='presupuesto')renderBudget();
+  if(t.dataset.panel==='coleccion')renderMine(); if(t.dataset.panel==='regalos')renderGift(); if(t.dataset.panel==='presupuesto')renderBudget();
   if(t.dataset.panel==='comparar')initCompare(); if(t.dataset.panel==='binder')renderBinder();
   if(t.dataset.panel==='abrir')renderPackStats(); if(t.dataset.panel==='progreso')renderProgreso();
 }); });
