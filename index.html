@@ -326,6 +326,25 @@
   @media (max-width: 820px) { .stats-row { grid-template-columns: repeat(3, minmax(0,1fr)); } .budget-grid { grid-template-columns: 1fr; } }
   @media (max-width: 520px) { .stats-row { grid-template-columns: 1fr 1fr; } .brand h1 { font-size: 1.3rem; } }
   @media print { .tabs, .search-bar, .chips, .filters, .pcard .act, .seg, .gift-controls, .mode-banner, .fx-bar, .io-row, .modal-bg { display: none !important; } .panel { display: block !important; } body { background: #fff; color: #000; } }
+  .wiki-block { background: linear-gradient(160deg, var(--panel), var(--bg2)); border:1px solid var(--line); border-radius:18px; padding:18px 20px; margin-bottom:16px; box-shadow:var(--shadow); position:relative; overflow:hidden; }
+  .wiki-block::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, var(--violet), var(--cyan)); }
+  .wiki-block h3 { font-size:1.05rem; margin-bottom:14px; display:flex; align-items:center; gap:8px; letter-spacing:-0.3px; }
+  .evo-chain { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:center; padding:6px 0; }
+  .evo-stage { text-align:center; cursor:pointer; padding:10px 8px; border-radius:14px; border:1px solid transparent; transition:all 0.18s; background:var(--bg2); }
+  .evo-stage:hover { transform:translateY(-4px); border-color:var(--violet); box-shadow:var(--glow); }
+  .evo-stage img { width:88px; height:88px; image-rendering:pixelated; background:radial-gradient(circle at 50% 60%,rgba(139,109,255,0.25),transparent 70%); border-radius:50%; }
+  .evo-stage .en { font-size:0.78rem; font-weight:bold; text-transform:capitalize; margin-top:6px; color:var(--ink); }
+  .evo-arrow { color:var(--cyan); font-weight:bold; font-size:1.3rem; text-align:center; }
+  .evo-cond { font-size:0.58rem; color:var(--muted); font-weight:normal; margin-top:2px; }
+  .wiki-ability { border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:9px; background:var(--bg2); transition:border-color 0.15s; }
+  .wiki-ability:hover { border-color:var(--gold-deep); }
+  .wiki-ability b { color:var(--gold); font-size:0.95rem; text-transform:capitalize; }
+  .wiki-ability .desc { font-size:0.8rem; color:var(--muted); margin-top:5px; line-height:1.45; }
+  .wiki-moves { width:100%; border-collapse:collapse; font-size:0.82rem; }
+  .wiki-moves th { background:var(--bg2); color:var(--muted); font-size:0.66rem; text-transform:uppercase; letter-spacing:0.4px; padding:9px 10px; text-align:left; }
+  .wiki-moves td { padding:8px 10px; border-bottom:1px solid var(--line); text-transform:capitalize; }
+  .wiki-moves tr:hover td { background:var(--panel2); }
+  .wiki-moves .mv-type { display:inline-block; font-weight:bold; padding:2px 10px; border-radius:20px; font-size:0.68rem; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.3); }
 </style>
 </head>
 <body>
