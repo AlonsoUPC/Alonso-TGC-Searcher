@@ -879,7 +879,7 @@ const PKTYPE_ES={normal:'Normal',fire:'Fuego',water:'Agua',electric:'Eléctrico'
 function renderPokePanel(pk){ if(!pk)return '';
   const spr=pk.gif||pk.still;
   const fb=(pk.still&&pk.still!==spr)?' onerror="this.onerror=null;this.src=\''+pk.still+'\'"':'';
-  const bars=pk.stats.map(s=>{ const pct=Math.round(s.base/255*100); const col=STAT_COLOR[s.name]||'var(--violet)';
+  const bars=pk.stats.map(s=>{ const pct=Math.min(100,Math.round(s.base/150*100)); const col=STAT_COLOR[s.name]||'var(--violet)';
     return '<div class="poke-stat"><span class="sname">'+(STAT_ES[s.name]||s.name)+'</span><span class="sbar"><span class="sfill" style="width:'+pct+'%;background:'+col+'"></span></span><span class="sval">'+s.base+'</span></div>'; }).join('');
   return '<div class="poke-panel"><h3>🎮 Datos de combate <span style="font-size:0.7rem;color:var(--muted);font-weight:normal">· PokéAPI</span></h3>'+
     '<div class="poke-top">'+(spr?'<img class="poke-sprite" src="'+spr+'" alt="'+pk.dexNo+'"'+fb+'>':'')+
