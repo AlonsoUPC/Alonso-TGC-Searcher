@@ -577,11 +577,8 @@
   <!-- COBBLEMON (noche) -->
   <section class="panel" id="p-cobblemon">
     <div class="col-head"><h2>🟫 Cobblemon <span style="font-size:0.72rem;color:var(--muted);font-weight:normal">· mod de Pokémon para Minecraft</span></h2></div>
-    <div class="checklist-note">
-      <b>¿Qué es Cobblemon?</b> Un mod gratuito y de código abierto que añade Pokémon a Minecraft (Java · Fabric/Forge/NeoForge). Atrapas Pokémon con Poké Balls, evolucionan con niveles/objetos y aparecen según el bioma. Datos de referencia offline.
-    </div>
     <div class="search-bar" style="margin-bottom:10px">
-      <input id="cob-q" type="text" placeholder="Filtra por Pokémon o bioma… (ej. Charmander, jungla, montaña)" autocomplete="off">
+      <input id="cob-q" type="text" placeholder="Busca un Pokémon… (ej. Charmander, Toxtricity)" autocomplete="off">
     </div>
     <div class="chips" id="cob-chips"></div>
     <div id="cob-content"></div>
@@ -642,6 +639,18 @@ function klassOf(name){
   return 'base';
 }
 const QUICK=["Sylveon","Greninja","Chandelure","Rotom","Toxtricity","Sableye","Swampert"];
+// Catálogo de respaldo: cartas reales que TCGdex aún no tiene indexadas.
+// Imagen desde LimitlessTCG (CDN público). Se fusionan en la búsqueda.
+const FALLBACK_CATALOG=[
+  {id:"svp-243", name:"Toxtricity ex", localId:"243/SV-P", set:"Illustration Contest 2024 (JP Promo)",
+   image:"https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpc/SVP/SVP_243_R_JP.png",
+   fallbackImages:["https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/cards/jp/SVP/243.png"],
+   names:{es:"Toxtricity ex",en:"Toxtricity ex",ja:"ストリンダーex"},
+   manual:{types:["Lightning"], rarity:"Promo", hp:260, stage:"Stage 1", evolveFrom:"Toxel (エレズン)", illustrator:"Anderson",
+     attacks:[{name:"ストラムサンダー (Storm Thunder)",damage:"240",effect:"Descarta 2 Energías de este Pokémon."}],
+     weaknesses:[{type:"Fighting",value:"×2"}], retreat:2,
+     note:"Promo japonesa del Illustration Contest 2024. No está en TCGdex; datos de LimitlessTCG."}}
+];
 const CATALOG=[
   {id:"sv08-086",name:"Sylveon ex",localId:"086",set:"Surging Sparks",image:"https://assets.tcgdex.net/es/sv/sv08/086"},
   {id:"sv08.5-041",name:"Sylveon ex",localId:"041",set:"Prismatic Evolutions",image:"https://assets.tcgdex.net/es/sv/sv08.5/041"},
@@ -699,13 +708,14 @@ let lastResults=[];
 
 const store={ get(){ try{return JSON.parse(localStorage.getItem('alonso_ns')||'{}');}catch(e){return {};} }, set(d){ localStorage.setItem('alonso_ns', JSON.stringify(d)); } };
 
-function imgTag(base,name){ if(!base)return '<div class="img-ph">🃏</div>';
+function imgTag(base,name,extra){ if(!base && !(extra&&extra.length))return '<div class="img-ph">🃏</div>';
   // candidatos: formato (high/low, webp/png) y también idioma alterno (en) por si /es no tiene la imagen
-  const bases=[base];
-  const enBase=base.replace('/es/','/en/');
-  if(enBase!==base) bases.push(enBase);
+  const bases=base?[base]:[];
+  if(base){ const enBase=base.replace('/es/','/en/'); if(enBase!==base) bases.push(enBase); }
   const c=[];
-  bases.forEach(b=>{ c.push(b+'/high.webp',b+'/high.png',b+'/low.webp',b+'/low.png'); });
+  bases.forEach(b=>{ if(b.startsWith('https://assets.tcgdex.net')) c.push(b+'/high.webp',b+'/high.png',b+'/low.webp',b+'/low.png'); else c.push(b); });
+  if(extra&&extra.length) extra.forEach(u=>c.push(u)); // imágenes de respaldo (otros CDNs)
+  if(!c.length) return '<div class="img-ph">🃏</div>';
   return '<img loading="lazy" src="'+c[0]+'" alt="'+(name||'').replace(/"/g,'&quot;')+'" data-cands="'+c.join('|')+'" data-i="0" onerror="imgFallback(this)">'; }
 function imgFallback(img){ const c=(img.dataset.cands||'').split('|'); let i=parseInt(img.dataset.i||'0',10)+1;
   if(i<c.length){img.dataset.i=i;img.src=c[i];} else {img.onerror=null;const ph=document.createElement('div');ph.className='img-ph';ph.textContent='🃏';if(img.parentNode)img.parentNode.replaceChild(ph,img);} }
@@ -847,8 +857,29 @@ document.getElementById('surprise').addEventListener('click',async ()=>{
 
 
 const resultsEl=document.getElementById('results');
-function localSearch(q){ const s=q.toLowerCase(); return CATALOG.filter(c=>c.name.toLowerCase().includes(s)); }
+function localSearch(q){ const s=q.toLowerCase();
+  const base=CATALOG.filter(c=>c.name.toLowerCase().includes(s));
+  const fb=fallbackMatches(q); return dedupById(base.concat(fb)); }
+// coincidencias del catálogo manual de respaldo (por nombre, número o id)
+function fallbackMatches(q){ const s=q.toLowerCase();
+  return FALLBACK_CATALOG.filter(c=>
+    c.name.toLowerCase().includes(s) ||
+    (c.localId&&String(c.localId).toLowerCase().includes(s)) ||
+    (c.id&&c.id.toLowerCase().includes(s)) ||
+    (c.names&&Object.values(c.names).some(n=>n&&n.toLowerCase().includes(s)))
+  ); }
+// registra una carta de respaldo en las cachés para que se muestre con sus datos manuales
+function registerFallback(c){
+  if(c.names){ nameCache[c.id]=Object.assign({}, nameCache[c.id], c.names);
+    cardLangName[c.id]=Object.assign({}, cardLangName[c.id], c.names); }
+  if(c.manual){ metaCache[c.id]={rarity:c.manual.rarity||'',types:c.manual.types||[],era:eraOf(c.id),full:Object.assign({},c.manual,{name:c.name,localId:c.localId,set:{name:c.set}})}; }
+  // sin precio en vivo: dejamos estimador por rareza
+  priceCache[c.id]=priceCache[c.id]||{est:true};
+}
+function dedupById(arr){ const seen={}; return (arr||[]).filter(c=>{ if(!c||!c.id||seen[c.id])return false; seen[c.id]=1; return true; }); }
 async function search(){ const q=document.getElementById('q').value.trim(); if(!q)return; const local=localSearch(q);
+  // registra respaldos que coincidan (para tener nombres/meta listos)
+  fallbackMatches(q).forEach(registerFallback);
   if(LIVE){ resultsEl.innerHTML='<div class="loading"><div class="spinner"></div>Buscando "'+q+'" en ES · EN · JA…</div>';
     try{
       // Buscamos el mismo término en los 3 idiomas y fusionamos por id
@@ -873,6 +904,8 @@ async function search(){ const q=document.getElementById('q').value.trim(); if(!
         if(seenKey[key]) return; seenKey[key]=1;
         data.push(c);
       });
+      // añade cartas del catálogo de respaldo que TCGdex no tiene (ej. Toxtricity 243/SV-P)
+      fallbackMatches(q).forEach(c=>{ if(!seenKey[c.id]){ seenKey[c.id]=1; data.push(c); } });
       if(data.length){ renderResults(data); return; }
     }catch(e){} }
   if(local.length)renderResults(local);
@@ -915,7 +948,7 @@ function renderResults(cards){
     shown.forEach(c=>{ const owned=col[c.id]; const m=metaCache[c.id]||{};
       const el=document.createElement('div'); el.className='pcard';
       el.innerHTML=(owned?'<div class="owned-badge">'+(owned.type==='gift'?'🎁':'⭐')+'</div>':'')+
-        '<div class="imgbox">'+imgTag(c.image,c.name)+'</div>'+
+        '<div class="imgbox">'+imgTag(c.image,c.name,c.fallbackImages)+'</div>'+
         '<div class="nm">'+c.name+'</div>'+
         altNamesHTML(c.id)+
         '<div class="st">'+(c.set?c.set+' · ':'')+'#'+(c.localId||'?')+'</div>'+
@@ -1082,35 +1115,42 @@ async function openDetail(card){
     trend='Tendencia 7d: €'+(cm.avg7!=null?cm.avg7.toFixed(2):'—')+' · 30d: €'+(cm.avg30!=null?cm.avg30.toFixed(2):'—'); }
   const chips=((m.types||[]).map(t=>{const es=TYPE_ES[t]||t;return '<span class="mchip tchip-'+es+'">'+es+'</span>';}).join(''))+
     (m.rarity?'<span class="mchip tchip-rar">'+m.rarity+'</span>':'');
-  // ==== Variantes disponibles (normal, reverse, holo, 1ª edición) con su precio ====
+  // ==== Versiones disponibles (normal, reverse, holo, 1ª edición) con precio por versión ====
   const VAR_ES={normal:'Normal',reverse:'Reverse Holo',holo:'Holo',firstEdition:'1.ª Edición',
     'reverse-holofoil':'Reverse Holo','holofoil':'Holo','1st-edition':'1.ª Edición','1st-edition-holofoil':'1.ª Ed. Holo','unlimited':'Ilimitada','unlimited-holofoil':'Ilim. Holo'};
   const tcg=(d.pricing&&d.pricing.tcgplayer)||{};
+  const cm=(d.pricing&&d.pricing.cardmarket)||{};
   const variantsAvail = d.variants || {};
-  // mapa variante->precio USD desde TCGplayer
+  // USD (TCGplayer) por versión
   function varUsd(key){ const alt={normal:'normal',reverse:'reverse-holofoil',holo:'holofoil',firstEdition:'1st-edition'};
-    const v=tcg[key]||tcg[alt[key]]; if(v&&v.marketPrice!=null)return v.marketPrice; if(v&&v.midPrice!=null)return v.midPrice; return null; }
+    const v=tcg[key]||tcg[alt[key]]; if(v&&v.marketPrice!=null)return v.marketPrice; if(v&&v.midPrice!=null)return v.midPrice; if(v&&v.lowPrice!=null)return v.lowPrice; return null; }
+  // EUR (Cardmarket) por versión: holo usa *-holo, el resto el promedio normal
+  function varEur(key){ if(key==='holo'||key==='firstEdition'){ if(cm['avg-holo']!=null)return cm['avg-holo']; if(cm['trend-holo']!=null)return cm['trend-holo']; }
+    if(cm.avg!=null)return cm.avg; if(cm.trend!=null)return cm.trend; return null; }
+  function rowFor(label,usd,eur){
+    let soles=null; if(usd!=null)soles=usd*fxUsd(); else if(eur!=null)soles=eur*fxEur();
+    return '<tr><td>'+label+'</td>'+
+      '<td class="num">'+(usd!=null?('$'+usd.toFixed(2)):'—')+'</td>'+
+      '<td class="num">'+(eur!=null?('€'+eur.toFixed(2)):'—')+'</td>'+
+      '<td class="num">'+(soles!=null?('S/ '+soles.toFixed(2)):'—')+'</td></tr>'; }
   let variantRows='';
   ['normal','reverse','holo','firstEdition'].forEach(k=>{
-    if(variantsAvail[k]){ const usd=varUsd(k);
-      const soles=(usd!=null)?(usd*fxUsd()):null;
-      variantRows+='<tr><td>'+(VAR_ES[k]||k)+'</td><td class="num">'+(usd!=null?('$'+usd.toFixed(2)):'—')+'</td><td class="num">'+(soles!=null?('S/ '+soles.toFixed(2)):'—')+'</td></tr>';
-    }
+    if(variantsAvail[k]){ variantRows+=rowFor(VAR_ES[k]||k, varUsd(k), varEur(k)); }
   });
   // fallback: si no hubo flags de variants pero sí precios por clave TCGplayer
   if(!variantRows){ Object.keys(tcg).forEach(k=>{ if(k==='updated'||k==='unit')return; const v=tcg[k];
     const usd=(v&&v.marketPrice!=null)?v.marketPrice:(v&&v.midPrice!=null?v.midPrice:null);
-    const soles=(usd!=null)?(usd*fxUsd()):null;
-    variantRows+='<tr><td>'+(VAR_ES[k]||k)+'</td><td class="num">'+(usd!=null?('$'+usd.toFixed(2)):'—')+'</td><td class="num">'+(soles!=null?('S/ '+soles.toFixed(2)):'—')+'</td></tr>'; }); }
+    const isHolo=/holo/i.test(k)&&!/reverse/i.test(k);
+    variantRows+=rowFor(VAR_ES[k]||k, usd, isHolo?varEur('holo'):varEur('normal')); }); }
   const variantsHTML = variantRows
-    ? '<div class="matks"><h3 style="font-size:0.95rem;margin-bottom:9px">🎴 Versiones disponibles</h3>'+
-      '<table class="btable"><thead><tr><th>Versión</th><th style="text-align:right">USD</th><th style="text-align:right">Soles</th></tr></thead><tbody>'+variantRows+'</tbody></table></div>'
+    ? '<div class="matks"><h3 style="font-size:0.95rem;margin-bottom:9px">🎴 Versiones disponibles <span style="font-size:0.7rem;color:var(--muted);font-weight:normal">· precio por versión</span></h3>'+
+      '<table class="btable"><thead><tr><th>Versión</th><th style="text-align:right">USD</th><th style="text-align:right">EUR</th><th style="text-align:right">Soles</th></tr></thead><tbody>'+variantRows+'</tbody></table></div>'
     : '';
   const atks=(d.attacks||[]).map(a=>'<div class="matk"><div class="aname"><b>'+(a.name||'')+'</b>'+(a.damage?'<span class="admg">'+a.damage+'</span>':'')+'</div>'+(a.effect?'<div>'+a.effect+'</div>':'')+'</div>').join('');
   const owned=(store.get()[card.id]||{}).type;
   modalEl.innerHTML='<button class="close-x">×</button>'+
     '<div class="mtop">'+
-      '<div class="mimg-wrap"><div class="mimg" id="tilt">'+imgTag(card.image,card.name)+'<div class="shine"></div><div class="glare"></div></div></div>'+
+      '<div class="mimg-wrap"><div class="mimg" id="tilt">'+imgTag(card.image,card.name,card.fallbackImages)+'<div class="shine"></div><div class="glare"></div></div></div>'+
       '<div class="minfo"><h2 id="m-title">'+card.name+'</h2>'+
         '<div class="msub">'+(card.set||'')+' · #'+(card.localId||'?')+(d.stage?' · '+d.stage:'')+'</div>'+
         namesHTML+
@@ -1142,7 +1182,7 @@ async function openDetail(card){
     const mimg=modalEl.querySelector('#tilt');
     if(mimg){ const newBase=imgBaseForLang(card.image,lang);
       // reconstruye la imagen con la base del idioma (mantiene shine/glare)
-      mimg.innerHTML=imgTag(newBase,card.name)+'<div class="shine"></div><div class="glare"></div>'; }
+      mimg.innerHTML=imgTag(newBase,card.name,card.fallbackImages)+'<div class="shine"></div><div class="glare"></div>'; }
     // título en el idioma elegido (si lo tenemos o lo pedimos)
     const title=modalEl.querySelector('#m-title');
     if(title){ const cached=(cardLangName[card.id]||{})[lang];
@@ -1562,92 +1602,106 @@ async function renderWiki(name){
     q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ clearTimeout(t); const v=e.target.value.trim(); if(v)renderWiki(v); } });
   }
 })();
-// ===== COBBLEMON (mod de Minecraft) — datos de referencia offline =====
-const COBBLEMON_INFO = {
-  version: 'Cobblemon (Minecraft Java · Fabric/Forge/NeoForge)',
-  basics: [
-    ['Captura','Lánzale una Poké Ball a un Pokémon salvaje. Debilitarlo primero (bajarle HP y dormir/paralizar) sube la probabilidad.'],
-    ['Combate','Los Pokémon suben de nivel combatiendo contra salvajes o de otros jugadores; aprenden movimientos al subir de nivel.'],
-    ['Curación','Usa una Healing Machine (se fabrica y se alimenta con Redstone) para curar todo tu equipo.'],
-    ['PC','Los Pokémon extra van a tu PC; accede desde una PC de Cobblemon para organizar cajas.'],
-    ['Spawns','Aparecen según bioma, hora del día, altura y clima. Cambia con Y (subterráneo, superficie, cielo).']
-  ],
-  balls: [
-    ['Poké Ball','Estándar. Se fabrica con Apricorns (bayas) + base metálica.'],
-    ['Great Ball','Mejor tasa que la Poké Ball.'],
-    ['Ultra Ball','Alta tasa de captura general.'],
-    ['Dusk Ball','Mejor de noche o en cuevas.'],
-    ['Net Ball','Mejor contra tipo Agua y Bicho.'],
-    ['Dive Ball','Mejor bajo el agua.'],
-    ['Timer Ball','Mejora cuantos más turnos pasan.'],
-    ['Quick Ball','Muy efectiva en el primer turno.']
-  ],
-  apricorns: ['Rojo → Poké Ball','Amarillo → variantes','Verde','Azul','Rosa','Blanco','Negro — se cultivan de árboles de Apricorn y se secan.'],
-  // spawns por bioma (curado, representativo — no es la lista completa del mod)
-  spawns: [
-    {mon:'Charmander', biomes:['Cuevas','Nether (cercanías)','Zonas rocosas cálidas'], time:'Día', dex:4},
-    {mon:'Bulbasaur', biomes:['Selva/Jungla','Bosque frondoso'], time:'Día', dex:1},
-    {mon:'Squirtle', biomes:['Ríos','Playas','Pantanos'], time:'Cualquiera', dex:7},
-    {mon:'Pikachu', biomes:['Bosque','Llanura','Bosque de flores'], time:'Día', dex:25},
-    {mon:'Eevee', biomes:['Llanura','Bosque','Aldeas'], time:'Día', dex:133},
-    {mon:'Gastly', biomes:['Cuevas','Bosque oscuro'], time:'Noche', dex:92},
-    {mon:'Magikarp', biomes:['Ríos','Océanos','Estanques'], time:'Cualquiera', dex:129},
-    {mon:'Geodude', biomes:['Montañas','Cuevas'], time:'Cualquiera', dex:74},
-    {mon:'Snorlax', biomes:['Selva','Bosque (raro)'], time:'Cualquiera', dex:143},
-    {mon:'Dratini', biomes:['Ríos profundos','Océanos'], time:'Cualquiera (raro)', dex:147},
-    {mon:'Growlithe', biomes:['Sabana','Zonas cálidas'], time:'Día', dex:58},
-    {mon:'Machop', biomes:['Montañas','Colinas'], time:'Día', dex:66}
-  ],
-  // evoluciones típicas dentro del mod
-  evos: [
-    ['Charmander → Charmeleon → Charizard','Nivel 16 y 36'],
-    ['Bulbasaur → Ivysaur → Venusaur','Nivel 16 y 32'],
-    ['Squirtle → Wartortle → Blastoise','Nivel 16 y 36'],
-    ['Pikachu → Raichu','Piedra Trueno'],
-    ['Eevee → Vaporeon / Jolteon / Flareon','Piedra Agua / Trueno / Fuego'],
-    ['Eevee → Espeon / Umbreon','Alta amistad de día / de noche'],
-    ['Gastly → Haunter → Gengar','Nivel 25 y luego por intercambio (o link cable)'],
-    ['Machop → Machoke → Machamp','Nivel 28 y luego por intercambio']
-  ],
-  links: [
-    {t:'Wiki oficial de Cobblemon', u:'https://wiki.cobblemon.com/'},
-    {t:'Spawns por bioma (wiki)', u:'https://wiki.cobblemon.com/index.php/Spawning'},
-    {t:'Sitio oficial', u:'https://cobblemon.com/'}
-  ]
+// ===== COBBLEMON — buscador de Pokémon estilo tarjetas (usa PokéAPI + capa Cobblemon) =====
+// Datos de spawn/bioma curados para Cobblemon (se superponen a PokéAPI). Ampliable.
+const COB_SPAWN = {
+  charmander:{biomes:['Cuevas','Zonas rocosas cálidas','cerca del Nether'],time:'Día',bucket:'uncommon'},
+  bulbasaur:{biomes:['Jungla','Bosque frondoso'],time:'Día',bucket:'uncommon'},
+  squirtle:{biomes:['Ríos','Playas','Pantanos'],time:'Cualquiera',bucket:'uncommon'},
+  pikachu:{biomes:['Bosque','Llanura','Bosque de flores'],time:'Día',bucket:'uncommon'},
+  eevee:{biomes:['Llanura','Bosque','Aldeas'],time:'Día',bucket:'rare'},
+  gastly:{biomes:['Cuevas','Bosque oscuro'],time:'Noche',bucket:'common'},
+  magikarp:{biomes:['Ríos','Océanos','Estanques'],time:'Cualquiera',bucket:'common'},
+  geodude:{biomes:['Montañas','Cuevas'],time:'Cualquiera',bucket:'common'},
+  snorlax:{biomes:['Jungla','Bosque (raro)'],time:'Cualquiera',bucket:'ultra-rare'},
+  dratini:{biomes:['Ríos profundos','Océanos'],time:'Cualquiera',bucket:'ultra-rare'},
+  growlithe:{biomes:['Sabana','Zonas cálidas'],time:'Día',bucket:'uncommon'},
+  machop:{biomes:['Montañas','Colinas'],time:'Día',bucket:'common'},
+  toxel:{biomes:['Llanura','Cuevas'],time:'Cualquiera',bucket:'uncommon'},
+  toxtricity:{biomes:['Llanura','Cuevas'],time:'Noche',bucket:'rare'}
 };
-function cobFilter(list, q){ if(!q) return list; const s=q.toLowerCase();
-  return list.filter(x=> (x.mon&&x.mon.toLowerCase().includes(s)) || (x.biomes&&x.biomes.join(' ').toLowerCase().includes(s)) ); }
-let cobQuery='';
-function renderCobblemon(){
+const COB_BUCKET_ES={common:'Común',uncommon:'Poco común',rare:'Raro','ultra-rare':'Ultra raro'};
+const COB_QUICK=['Charmander','Pikachu','Eevee','Gastly','Snorlax','Toxtricity'];
+const cobCache={}; // cache de resultados por slug
+
+// normaliza a slug PokéAPI (quita acentos, sufijos TCG, formas)
+function cobSlug(name){ let n=(name||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  n=n.replace(/\b(ex|gx|v|vmax|vstar|mega|radiante|radiant)\b/g,' ').replace(/[^a-z0-9\s-]/g,' ').replace(/\s+/g,' ').trim();
+  return n.split(' ')[0]||''; }
+
+async function cobFetch(name){
+  const slug=cobSlug(name); if(!slug) return null;
+  if(cobCache[slug]!==undefined) return cobCache[slug];
+  if(!LIVE){ cobCache[slug]=undefined; return null; }
+  let p=null;
+  try{ const r=await fetch(POKEAPI+'/pokemon/'+slug); if(r.ok) p=await r.json(); }catch(e){}
+  if(!p){ cobCache[slug]=null; return null; }
+  let esName=slug, flavor='', evo=[];
+  try{ const rs=await fetch(POKEAPI+'/pokemon-species/'+p.id); if(rs.ok){ const s=await rs.json();
+    const nm=(s.names||[]).find(x=>x.language&&x.language.name==='es'); if(nm)esName=nm.name;
+    const fe=(s.flavor_text_entries||[]); const es=fe.filter(e=>e.language&&e.language.name==='es');
+    const pick=(es[es.length-1]||es[0]||fe.find(e=>e.language&&e.language.name==='en'));
+    if(pick)flavor=pick.flavor_text.replace(/[\n\f\r]+/g,' ').replace(/\s+/g,' ').trim();
+    if(s.evolution_chain&&s.evolution_chain.url){ const re=await fetch(s.evolution_chain.url);
+      if(re.ok){ const ec=await re.json(); const walk=n=>{ if(!n)return; evo.push(n.species.name); (n.evolves_to||[]).forEach(walk); }; walk(ec.chain); } }
+  }catch(e){}
+  const data={ id:p.id, slug, esName, en:p.name, types:(p.types||[]).map(t=>t.type.name),
+    stats:(p.stats||[]).map(s=>({name:s.stat.name,base:s.base_stat})),
+    height:p.height/10, weight:p.weight/10, flavor, evo,
+    sprite:(p.sprites&&p.sprites.other&&p.sprites.other['official-artwork']&&p.sprites.other['official-artwork'].front_default)||(p.sprites&&p.sprites.front_default)||null,
+    gif:((((p.sprites||{}).versions||{})['generation-v']||{})['black-white']||{}).animated?((((p.sprites||{}).versions||{})['generation-v']||{})['black-white']||{}).animated.front_default:null };
+  cobCache[slug]=data; return data;
+}
+
+function cobCardHTML(d, spawn){
+  const spr=d.gif||d.sprite;
+  const types=d.types.map(t=>{const es=PKTYPE_ES[t]||t;const col=MVTYPE_COLOR[t]||'#777';return '<span class="mv-type" style="background:'+col+'">'+es+'</span>';}).join(' ');
+  const statsBars=d.stats.map(s=>{ const pct=Math.min(100,Math.round(s.base/150*100)); const col=STAT_COLOR[s.name]||'var(--violet)';
+    return '<div class="poke-stat"><span class="sname">'+(STAT_ES[s.name]||s.name)+'</span><span class="sbar"><span class="sfill" style="width:'+pct+'%;background:'+col+'"></span></span><span class="sval">'+s.base+'</span></div>'; }).join('');
+  const spawnHTML = spawn
+    ? '<div class="mrow"><span class="lbl">🗺️ Biomas</span><span>'+spawn.biomes.join(', ')+'</span></div>'+
+      '<div class="mrow"><span class="lbl">🕒 Horario</span><span>'+spawn.time+'</span></div>'+
+      '<div class="mrow"><span class="lbl">🎲 Rareza</span><span>'+(COB_BUCKET_ES[spawn.bucket]||spawn.bucket)+'</span></div>'
+    : '<div class="mrow"><span class="lbl">🗺️ Spawn</span><span style="color:var(--muted)">Sin datos curados · revisa la wiki del mod/addon</span></div>';
+  const evoHTML = d.evo.length>1 ? '<div class="mrow"><span class="lbl">🧬 Evolución</span><span style="text-transform:capitalize">'+d.evo.join(' → ')+'</span></div>' : '';
+  return '<div class="cmp-col" style="max-width:520px;margin:0 auto">'+
+    '<div class="poke-top">'+(spr?'<img class="poke-sprite" src="'+spr+'" alt="'+d.esName+'">':'')+
+      '<div class="poke-meta"><div style="font-size:1.2rem;font-weight:bold;color:var(--ink);text-transform:capitalize">'+d.esName+'</div>'+
+      '<div style="color:var(--muted);font-size:0.78rem">N.º Pokédex #'+d.id+' · EN: '+d.en+'</div>'+
+      '<div style="margin-top:6px">'+types+'</div></div>'+
+    '</div>'+
+    (d.flavor?'<div class="poke-flavor">"'+d.flavor+'"</div>':'')+
+    '<div style="margin-top:12px">'+spawnHTML+evoHTML+
+      '<div class="mrow"><span class="lbl">Altura / Peso</span><span>'+d.height.toFixed(1)+' m · '+d.weight.toFixed(1)+' kg</span></div>'+
+    '</div>'+
+    '<div class="poke-stats" style="margin-top:12px">'+statsBars+'</div>'+
+  '</div>';
+}
+
+let cobTimer=null;
+async function renderCobblemon(force){
   const box=document.getElementById('cob-content'); if(!box) return;
   const chips=document.getElementById('cob-chips');
   if(chips && !chips.dataset.init){ chips.dataset.init='1';
-    ['Charmander','Pikachu','Eevee','jungla','montaña','noche'].forEach(n=>{ const b=document.createElement('button'); b.className='chip'; b.textContent=n;
-      b.addEventListener('click',()=>{ document.getElementById('cob-q').value=n; cobQuery=n; renderCobblemon(); }); chips.appendChild(b); }); }
-  const CI=COBBLEMON_INFO;
-  const spawns=cobFilter(CI.spawns, cobQuery);
-  const spawnRows=spawns.map(s=>'<tr><td>'+s.mon+' <span style="color:var(--muted)">#'+s.dex+'</span></td><td>'+s.biomes.join(', ')+'</td><td>'+s.time+'</td></tr>').join('') || '<tr><td colspan="3" style="color:var(--muted)">Sin coincidencias.</td></tr>';
-  box.innerHTML=
-    '<div class="wiki-block"><h3>🎒 Básicos del mod</h3>'+
-      CI.basics.map(b=>'<div class="wiki-ability"><b>'+b[0]+'</b><div class="desc">'+b[1]+'</div></div>').join('')+
-    '</div>'+
-    '<div class="wiki-block"><h3>🗺️ Spawns por bioma</h3>'+
-      '<div style="overflow-x:auto"><table class="wiki-moves"><thead><tr><th>Pokémon</th><th>Biomas</th><th>Horario</th></tr></thead><tbody>'+spawnRows+'</tbody></table></div>'+
-    '</div>'+
-    '<div class="wiki-block"><h3>🧬 Evoluciones típicas</h3>'+
-      CI.evos.map(e=>'<div class="wiki-ability"><b>'+e[0]+'</b><div class="desc">'+e[1]+'</div></div>').join('')+
-    '</div>'+
-    '<div class="wiki-block"><h3>⚪ Poké Balls y Apricorns</h3>'+
-      CI.balls.map(b=>'<div class="wiki-ability"><b>'+b[0]+'</b><div class="desc">'+b[1]+'</div></div>').join('')+
-      '<div class="desc" style="margin-top:8px"><b style="color:var(--gold)">Apricorns:</b> '+CI.apricorns.join(' · ')+'</div>'+
-    '</div>'+
-    '<div class="wiki-block"><h3>🔗 Enlaces útiles</h3>'+
-      '<div class="desc">'+CI.links.map(l=>'<a href="'+l.u+'" target="_blank" style="color:var(--cyan)">'+l.t+'</a>').join(' · ')+'</div>'+
-      '<div class="desc" style="margin-top:8px;color:var(--muted)">Cobblemon es un proyecto de la comunidad, sin relación con The Pokémon Company. Datos de referencia.</div>'+
-    '</div>';
+    COB_QUICK.forEach(n=>{ const b=document.createElement('button'); b.className='chip'; b.textContent=n;
+      b.addEventListener('click',()=>{ document.getElementById('cob-q').value=n; doCobSearch(n); }); chips.appendChild(b); }); }
+  if(!box.dataset.init){ box.dataset.init='1';
+    box.innerHTML='<div class="checklist-note"><b>¿Qué es Cobblemon?</b> Mod gratuito y open-source que añade Pokémon a Minecraft. Busca cualquier Pokémon para ver sus datos (tipos, stats, evolución) y dónde aparece. Funciona con los 1000+ oficiales; los Pokémon de addons de terceros salen si existen en PokéAPI, y si no, te avisa.</div>'+
+      '<div class="empty">Escribe o toca un Pokémon 👆</div>'; }
+}
+async function doCobSearch(name){
+  const box=document.getElementById('cob-content'); if(!box) return;
+  const note='<div class="checklist-note"><b>Cobblemon:</b> datos del Pokémon + spawn en el mod. Los Pokémon de addons de terceros salen si existen en PokéAPI.</div>';
+  if(!LIVE){ box.innerHTML=note+'<div class="empty">Cobblemon necesita conexión en vivo. Ábrelo fuera de Dia.</div>'; return; }
+  box.innerHTML=note+'<div class="loading"><div class="spinner"></div>Buscando '+name+'…</div>';
+  const d=await cobFetch(name);
+  if(!d){ box.innerHTML=note+'<div class="empty">No encontré "'+name+'" en PokéAPI. Si es un Pokémon de un addon de terceros que no está en PokéAPI, no tengo sus datos — pero en tu juego funcionará igual si el addon lo incluye.</div>'; return; }
+  const spawn=COB_SPAWN[d.slug];
+  box.innerHTML=note+cobCardHTML(d, spawn);
 }
 (function initCob(){ const q=document.getElementById('cob-q');
-  if(q){ let t=null; q.addEventListener('input',e=>{ clearTimeout(t); cobQuery=e.target.value.trim(); t=setTimeout(renderCobblemon,180); }); }
+  if(q){ q.addEventListener('input',e=>{ clearTimeout(cobTimer); const v=e.target.value.trim(); if(v.length<3)return; cobTimer=setTimeout(()=>doCobSearch(v),400); });
+    q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ clearTimeout(cobTimer); const v=e.target.value.trim(); if(v)doCobSearch(v); } }); }
 })();
 refreshStats(); paintBanner();
 probe().then(()=>{ Object.values(store.get()).forEach(c=>fetchPrice(c.id,c.name).then(refreshStats)); });
