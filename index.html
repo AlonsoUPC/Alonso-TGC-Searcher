@@ -369,6 +369,7 @@
       <button class="tab night-only" data-panel="binder">📔 Binder</button>
       <button class="tab night-only" data-panel="progreso">📊 Progreso</button>
       <button class="tab night-only" data-panel="wiki">📖 Wiki</button>
+      <button class="tab night-only" data-panel="cobblemon">🟫 Cobblemon</button>
     </div>
   </header>
 
@@ -573,6 +574,19 @@
     <div id="wiki-content"><div class="empty">Escribe un nombre o toca un Pokémon 👆</div></div>
   </section>
 
+  <!-- COBBLEMON (noche) -->
+  <section class="panel" id="p-cobblemon">
+    <div class="col-head"><h2>🟫 Cobblemon <span style="font-size:0.72rem;color:var(--muted);font-weight:normal">· mod de Pokémon para Minecraft</span></h2></div>
+    <div class="checklist-note">
+      <b>¿Qué es Cobblemon?</b> Un mod gratuito y de código abierto que añade Pokémon a Minecraft (Java · Fabric/Forge/NeoForge). Atrapas Pokémon con Poké Balls, evolucionan con niveles/objetos y aparecen según el bioma. Datos de referencia offline.
+    </div>
+    <div class="search-bar" style="margin-bottom:10px">
+      <input id="cob-q" type="text" placeholder="Filtra por Pokémon o bioma… (ej. Charmander, jungla, montaña)" autocomplete="off">
+    </div>
+    <div class="chips" id="cob-chips"></div>
+    <div id="cob-content"></div>
+  </section>
+
   <footer class="foot">
     Datos e imágenes: <a href="https://tcgdex.dev/es" target="_blank">TCGdex API</a> · precios de TCGplayer (USD) y Cardmarket (EUR) convertidos a soles.<br>
     Precios de referencia internacional, no ofertas de venta en Perú. Pokémon © Nintendo, Creatures Inc., GAME FREAK inc.
@@ -585,7 +599,35 @@
 </div>
 
 <script>
-const API = 'https://api.tcgdex.net/v2/es';
+// API multi-idioma: base + endpoints por idioma (ES / EN / JA)
+const API_BASE = 'https://api.tcgdex.net/v2';
+const API = API_BASE + '/es';                 // idioma principal (compat.)
+const API_ES = API_BASE + '/es';
+const API_EN = API_BASE + '/en';
+const API_JA = API_BASE + '/ja';
+const SEARCH_LANGS = [API_ES, API_EN, API_JA]; // se fusionan al buscar en vivo
+// idiomas disponibles para ver la carta (imagen + nombre reales)
+const LANGS = [
+  {code:'es',flag:'🇪🇸'},{code:'en',flag:'🇬🇧'},{code:'ja',flag:'🇯🇵'},
+  {code:'fr',flag:'🇫🇷'},{code:'de',flag:'🇩🇪'},{code:'it',flag:'🇮🇹'},{code:'pt',flag:'🇵🇹'}
+];
+// cambia el segmento de idioma de una URL de imagen de TCGdex
+function imgBaseForLang(base, lang){
+  if(!base) return base;
+  return base.replace(/\/(es|en|ja|fr|de|it|pt|ko|zh-tw|zh-cn|id|th|nl|pl|ru)\//, '/'+lang+'/');
+}
+// caché de nombres por carta e idioma consultado on-demand
+const cardLangName = {}; // cardLangName[id] = {es:..., en:..., fr:...}
+async function fetchCardName(id, lang){
+  cardLangName[id]=cardLangName[id]||{};
+  if(cardLangName[id][lang]!==undefined) return cardLangName[id][lang];
+  try{ const r=await fetch(API_BASE+'/'+lang+'/cards/'+id);
+    if(r.ok){ const d=await r.json(); cardLangName[id][lang]=(d&&d.name)?d.name:null; return cardLangName[id][lang]; }
+  }catch(e){}
+  cardLangName[id][lang]=null; return null;
+}
+// caché de nombres por idioma: nameCache[id] = {es,en,ja}
+const nameCache = {};
 function estBySlug(name) {
   const n=(name||'').toLowerCase();
   if(n.includes('vmax'))return 18; if(n.includes('vstar'))return 16; if(n.includes('gx'))return 15;
@@ -658,7 +700,12 @@ let lastResults=[];
 const store={ get(){ try{return JSON.parse(localStorage.getItem('alonso_ns')||'{}');}catch(e){return {};} }, set(d){ localStorage.setItem('alonso_ns', JSON.stringify(d)); } };
 
 function imgTag(base,name){ if(!base)return '<div class="img-ph">🃏</div>';
-  const c=[base+'/high.webp',base+'/high.png',base+'/low.webp',base+'/low.png'];
+  // candidatos: formato (high/low, webp/png) y también idioma alterno (en) por si /es no tiene la imagen
+  const bases=[base];
+  const enBase=base.replace('/es/','/en/');
+  if(enBase!==base) bases.push(enBase);
+  const c=[];
+  bases.forEach(b=>{ c.push(b+'/high.webp',b+'/high.png',b+'/low.webp',b+'/low.png'); });
   return '<img loading="lazy" src="'+c[0]+'" alt="'+(name||'').replace(/"/g,'&quot;')+'" data-cands="'+c.join('|')+'" data-i="0" onerror="imgFallback(this)">'; }
 function imgFallback(img){ const c=(img.dataset.cands||'').split('|'); let i=parseInt(img.dataset.i||'0',10)+1;
   if(i<c.length){img.dataset.i=i;img.src=c[i];} else {img.onerror=null;const ph=document.createElement('div');ph.className='img-ph';ph.textContent='🃏';if(img.parentNode)img.parentNode.replaceChild(ph,img);} }
@@ -666,28 +713,76 @@ function fxUsd(){ return parseFloat(document.getElementById('fx-usd').value)||3.
 function fxEur(){ return parseFloat(document.getElementById('fx-eur').value)||4.05; }
 
 function priceToSoles(card){ const p=priceCache[card.id];
-  if(p&&!p.est){ if(p.usd!=null)return {soles:p.usd*fxUsd(),label:'US$ '+p.usd.toFixed(2)+' · TCGplayer',live:true};
-    if(p.eur!=null)return {soles:p.eur*fxEur(),label:'€ '+p.eur.toFixed(2)+' · Cardmarket',live:true}; }
-  return {soles:estBySlug(card.name),label:'estimado por rareza',live:false}; }
+  if(p&&!p.est){
+    const usd=(p.usd!=null)?p.usd:null, eur=(p.eur!=null)?p.eur:null;
+    // soles: preferimos USD (TCGplayer), si no EUR (Cardmarket)
+    let soles, label;
+    if(usd!=null){ soles=usd*fxUsd(); label='US$ '+usd.toFixed(2)+' · TCGplayer'; }
+    else { soles=eur*fxEur(); label='€ '+eur.toFixed(2)+' · Cardmarket'; }
+    return {soles, label, live:true, usd, eur}; }
+  return {soles:estBySlug(card.name),label:'estimado por rareza',live:false,usd:null,eur:null}; }
+// texto compacto de precios en 3 monedas (S/ · US$ · €)
+function priceMultiLine(conv){
+  const parts=[];
+  if(conv.usd!=null) parts.push('US$ '+conv.usd.toFixed(2));
+  if(conv.eur!=null) parts.push('€ '+conv.eur.toFixed(2));
+  return parts.join(' · ');
+}
+// línea compacta con nombres EN / JA (si los tenemos cacheados)
+function altNamesHTML(id){
+  const nc=nameCache[id]; if(!nc) return '';
+  const bits=[];
+  if(nc.en) bits.push('EN: '+nc.en);
+  if(nc.ja) bits.push('JA: '+nc.ja);
+  if(!bits.length) return '';
+  return '<div class="nm-alt">'+bits.join(' · ')+'</div>';
+}
 
 async function fetchDetail(id){
   if(priceCache[id]&&metaCache[id])return;
   if(!LIVE){ priceCache[id]=priceCache[id]||{est:true}; metaCache[id]=metaCache[id]||{rarity:'',types:[],era:eraOf(id)}; return; }
-  try{ const r=await fetch(API+'/cards/'+id); if(r.ok){ const d=await r.json();
+  try{ const r=await fetch(API_ES+'/cards/'+id); if(r.ok){ const d=await r.json();
     metaCache[id]={rarity:d.rarity||'',types:d.types||[],era:eraOf(id),full:d};
     const pr=d.pricing||{}; let usd=null,eur=null;
-    if(pr.tcgplayer){const t=pr.tcgplayer;const v=t.holofoil||t.normal||t.reverse||null; if(v&&v.marketPrice!=null)usd=v.marketPrice; else if(v&&v.midPrice!=null)usd=v.midPrice;}
-    if(pr.cardmarket&&pr.cardmarket.avg!=null)eur=pr.cardmarket.avg;
-    priceCache[id]=(usd!=null||eur!=null)?{usd,eur,src:'live'}:{est:true}; return; } }catch(e){}
+    if(pr.tcgplayer){const t=pr.tcgplayer;const v=t.holofoil||t.normal||t.reverse||t.holo||null; if(v&&v.marketPrice!=null)usd=v.marketPrice; else if(v&&v.midPrice!=null)usd=v.midPrice;}
+    if(pr.cardmarket){ const cm=pr.cardmarket; if(cm.avg!=null)eur=cm.avg; else if(cm.trend!=null)eur=cm.trend; }
+    priceCache[id]=(usd!=null||eur!=null)?{usd,eur,src:'live'}:{est:true};
+    // nombre ES ya lo tenemos; pedimos EN y JA en paralelo (sin bloquear precio)
+    fetchNames(id, d.name);
+    return; } }catch(e){}
   priceCache[id]=priceCache[id]||{est:true}; metaCache[id]=metaCache[id]||{rarity:'',types:[],era:eraOf(id)};
+}
+// Trae los nombres de la carta en ES/EN/JA y los cachea
+async function fetchNames(id, esName){
+  if(nameCache[id]&&nameCache[id].en&&nameCache[id].ja) return nameCache[id];
+  const cur=nameCache[id]||{}; if(esName)cur.es=esName;
+  nameCache[id]=cur;
+  try{
+    const [re,rj]=await Promise.all([
+      fetch(API_EN+'/cards/'+id).catch(()=>null),
+      fetch(API_JA+'/cards/'+id).catch(()=>null)
+    ]);
+    if(re&&re.ok){ const de=await re.json(); if(de&&de.name)cur.en=de.name; }
+    if(rj&&rj.ok){ const dj=await rj.json(); if(dj&&dj.name)cur.ja=dj.name; }
+  }catch(e){}
+  nameCache[id]=cur; return cur;
 }
 function fetchPrice(id,name){ return fetchDetail(id).then(()=>priceCache[id]); }
 function fetchMeta(id,name){ return fetchDetail(id).then(()=>metaCache[id]||{rarity:'',types:[],era:eraOf(id)}); }
 
-async function probe(){ try{ const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),4000);
-  const r=await fetch(API+'/cards?name=pikachu',{signal:ctrl.signal});clearTimeout(t);if(r.ok)LIVE=true;}catch(e){LIVE=false;} paintBanner(); }
+async function probe(){
+  // sondeo más robusto: probamos varios endpoints hasta que uno responda
+  const targets=[API_ES+'/cards?name=pikachu', API_EN+'/cards?name=pikachu', API_ES+'/series'];
+  for(const url of targets){
+    try{ const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),6000);
+      const r=await fetch(url,{signal:ctrl.signal});clearTimeout(t);
+      if(r.ok){ LIVE=true; break; }
+    }catch(e){}
+  }
+  paintBanner();
+}
 function paintBanner(){ const b=document.getElementById('mode-banner'),t=document.getElementById('mode-text');
-  if(LIVE){b.className='mode-banner live';t.innerHTML='<b>En vivo.</b> Buscas todo el catálogo con precios reales.';}
+  if(LIVE){b.className='mode-banner live';t.innerHTML='<b>En vivo.</b> Buscas TODO el catálogo (ES + EN + JA fusionados) con precios reales en 3 monedas.';}
   else{b.className='mode-banner local';t.innerHTML='<b>Modo catálogo.</b> Tus Pokémon precargados; precios por estimador. Ábrelo fuera de Dia para todo en vivo.';} }
 
 document.querySelectorAll('.tab').forEach(t=>{ t.addEventListener('click',()=>{
@@ -697,6 +792,7 @@ document.querySelectorAll('.tab').forEach(t=>{ t.addEventListener('click',()=>{
   if(t.dataset.panel==='coleccion')renderMine(); if(t.dataset.panel==='regalos')renderGift(); if(t.dataset.panel==='presupuesto')renderBudget();
   if(t.dataset.panel==='comparar')initCompare(); if(t.dataset.panel==='binder')renderBinder();
   if(t.dataset.panel==='abrir')renderPackStats(); if(t.dataset.panel==='progreso')renderProgreso();
+  if(t.dataset.panel==='cobblemon')renderCobblemon();
 }); });
 
 ['fx-usd','fx-eur'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{ refreshStats();renderBudget();
@@ -753,8 +849,32 @@ document.getElementById('surprise').addEventListener('click',async ()=>{
 const resultsEl=document.getElementById('results');
 function localSearch(q){ const s=q.toLowerCase(); return CATALOG.filter(c=>c.name.toLowerCase().includes(s)); }
 async function search(){ const q=document.getElementById('q').value.trim(); if(!q)return; const local=localSearch(q);
-  if(LIVE){ resultsEl.innerHTML='<div class="loading"><div class="spinner"></div>Buscando "'+q+'"…</div>';
-    try{ const r=await fetch(API+'/cards?name='+encodeURIComponent(q)); if(r.ok){const data=await r.json(); if(Array.isArray(data)&&data.length){renderResults(data);return;}} }catch(e){} }
+  if(LIVE){ resultsEl.innerHTML='<div class="loading"><div class="spinner"></div>Buscando "'+q+'" en ES · EN · JA…</div>';
+    try{
+      // Buscamos el mismo término en los 3 idiomas y fusionamos por id
+      const results=await Promise.all(SEARCH_LANGS.map(base=>
+        fetch(base+'/cards?name='+encodeURIComponent(q)).then(r=>r.ok?r.json():[]).catch(()=>[])
+      ));
+      const merged={}; const langKey=[ 'es','en','ja' ];
+      results.forEach((arr,li)=>{ if(!Array.isArray(arr))return;
+        arr.forEach(b=>{ if(!b||!b.id)return;
+          if(!merged[b.id]) merged[b.id]={id:b.id,name:b.name,localId:(b.localId!=null?String(b.localId):''),set:'',image:b.image||''};
+          // guardamos el nombre en su idioma para mostrarlo trilingüe
+          const nc=nameCache[b.id]||{}; nc[langKey[li]]=b.name; nameCache[b.id]=nc;
+          // preferimos nombre ES para el título de la tarjeta
+          if(li===0 && b.name) merged[b.id].name=b.name;
+          if(!merged[b.id].image && b.image) merged[b.id].image=b.image;
+        });
+      });
+      // dedup extra: colapsa cartas idénticas (mismo id ya está; además mismo set+número+nombre)
+      const seenKey={}; const data=[];
+      Object.values(merged).forEach(c=>{
+        const key=c.id; // el id ya es único por carta/idioma; garantizamos 1 sola entrada por id
+        if(seenKey[key]) return; seenKey[key]=1;
+        data.push(c);
+      });
+      if(data.length){ renderResults(data); return; }
+    }catch(e){} }
   if(local.length)renderResults(local);
   else resultsEl.innerHTML='<div class="empty">No hay cartas de "'+q+'" en el catálogo local.'+(LIVE?'':' Ábrelo fuera de Dia para búsqueda completa.')+'</div>'; }
 document.getElementById('go').addEventListener('click',search);
@@ -766,10 +886,15 @@ document.getElementById('q').addEventListener('input',e=>{ clearTimeout(searchTi
 
 function priceBlockHTML(card){ const p=priceCache[card.id]; if(!p)return '<span class="pe-loading">Cargando…</span>';
   const conv=priceToSoles(card);
-  if(conv.live)return '<span class="pe-soles">S/ '+conv.soles.toFixed(2)+'</span><div class="pe-src">'+conv.label+'</div>';
+  const multi=conv.live?priceMultiLine(conv):'';
+  if(conv.live)return '<span class="pe-soles">S/ '+conv.soles.toFixed(2)+'</span>'+(multi?'<div class="pe-multi">'+multi+'</div>':'')+'<div class="pe-src">'+conv.label+'</div>';
   return '<span class="pe-soles pe-est">~S/ '+conv.soles.toFixed(2)+'</span><div class="pe-src">'+conv.label+'</div>'; }
 function attachPrice(el,card){ const pb=el.querySelector('.price-block'); if(!pb)return; pb.dataset.cid=card.id;
-  fetchPrice(card.id,card.name).then(()=>{pb.innerHTML=priceBlockHTML(card);refreshStats();}); }
+  fetchPrice(card.id,card.name).then(()=>{pb.innerHTML=priceBlockHTML(card);refreshStats();});
+  // cuando lleguen los nombres EN/JA, refrescamos la línea de idiomas de la tarjeta
+  if(LIVE){ fetchNames(card.id, card.name).then(()=>{ const alt=el.querySelector('.nm-alt'); const html=altNamesHTML(card.id);
+    if(html){ if(alt){ alt.outerHTML=html; } else { const nm=el.querySelector('.nm'); if(nm) nm.insertAdjacentHTML('afterend', html); } } }); }
+}
 
 function sortResults(list,mode){ const a=[...list];
   if(mode==='price-desc')a.sort((x,y)=>priceToSoles(y).soles-priceToSoles(x).soles);
@@ -777,7 +902,10 @@ function sortResults(list,mode){ const a=[...list];
   else if(mode==='name')a.sort((x,y)=>x.name.localeCompare(y.name));
   return a; }
 
-function renderResults(cards){ lastResults=cards||[]; const col=store.get();
+function renderResults(cards){
+  // dedup defensivo por id (evita duplicados vengan de donde vengan)
+  const _seen={}; lastResults=(cards||[]).filter(c=>{ if(!c||!c.id) return false; if(_seen[c.id]) return false; _seen[c.id]=1; return true; });
+  const col=store.get();
   ensureMeta(lastResults,()=>{ populateFilterOptions();
     let shown=lastResults.filter(c=>matchesFilter(c,'search'));
     shown=sortResults(shown,filters.search.sort);
@@ -789,6 +917,7 @@ function renderResults(cards){ lastResults=cards||[]; const col=store.get();
       el.innerHTML=(owned?'<div class="owned-badge">'+(owned.type==='gift'?'🎁':'⭐')+'</div>':'')+
         '<div class="imgbox">'+imgTag(c.image,c.name)+'</div>'+
         '<div class="nm">'+c.name+'</div>'+
+        altNamesHTML(c.id)+
         '<div class="st">'+(c.set?c.set+' · ':'')+'#'+(c.localId||'?')+'</div>'+
         (m.rarity||(m.types&&m.types.length)?'<div class="badges">'+(m.rarity?'<span class="mini-badge rar-b">'+m.rarity+'</span>':'')+((m.types||[]).map(t=>'<span class="mini-badge type-b">'+(TYPE_ES[t]||t)+'</span>').join(''))+'</div>':'')+
         '<div class="price-block"><span class="pe-loading">Cargando…</span></div>'+
@@ -935,6 +1064,17 @@ async function openDetail(card){
   modalEl.innerHTML='<button class="close-x">×</button><div class="loading"><div class="spinner"></div>Cargando ficha…</div>';
   modalBg.classList.add('open'); modalEl.querySelector('.close-x').addEventListener('click',closeModal);
   await fetchDetail(card.id);
+  if(LIVE){ await fetchNames(card.id, card.name); }
+  const nc=nameCache[card.id]||{};
+  const namesHTML='<div class="mnames">'+
+    '<span><b>ES:</b> '+((nc.es||card.name)||'—')+'</span>'+
+    (nc.en?'<span><b>EN:</b> '+nc.en+'</span>':'')+
+    (nc.ja?'<span><b>JA:</b> '+nc.ja+'</span>':'')+
+  '</div>';
+  // barra selector de idioma real: cambia imagen + nombre de la carta
+  const langBar='<div class="lang-seg" id="lang-seg" style="margin:2px 0 12px">'+
+    LANGS.map((L,i)=>'<button data-lang="'+L.code+'"'+(i===0?' class="on"':'')+'>'+L.flag+' '+L.code.toUpperCase()+'</button>').join('')+
+  '</div>';
   const m=metaCache[card.id]||{}, d=m.full||{}, conv=priceToSoles(card);
   const pr=(d.pricing&&d.pricing.tcgplayer)||null;
   let trend='';
@@ -942,23 +1082,51 @@ async function openDetail(card){
     trend='Tendencia 7d: €'+(cm.avg7!=null?cm.avg7.toFixed(2):'—')+' · 30d: €'+(cm.avg30!=null?cm.avg30.toFixed(2):'—'); }
   const chips=((m.types||[]).map(t=>{const es=TYPE_ES[t]||t;return '<span class="mchip tchip-'+es+'">'+es+'</span>';}).join(''))+
     (m.rarity?'<span class="mchip tchip-rar">'+m.rarity+'</span>':'');
+  // ==== Variantes disponibles (normal, reverse, holo, 1ª edición) con su precio ====
+  const VAR_ES={normal:'Normal',reverse:'Reverse Holo',holo:'Holo',firstEdition:'1.ª Edición',
+    'reverse-holofoil':'Reverse Holo','holofoil':'Holo','1st-edition':'1.ª Edición','1st-edition-holofoil':'1.ª Ed. Holo','unlimited':'Ilimitada','unlimited-holofoil':'Ilim. Holo'};
+  const tcg=(d.pricing&&d.pricing.tcgplayer)||{};
+  const variantsAvail = d.variants || {};
+  // mapa variante->precio USD desde TCGplayer
+  function varUsd(key){ const alt={normal:'normal',reverse:'reverse-holofoil',holo:'holofoil',firstEdition:'1st-edition'};
+    const v=tcg[key]||tcg[alt[key]]; if(v&&v.marketPrice!=null)return v.marketPrice; if(v&&v.midPrice!=null)return v.midPrice; return null; }
+  let variantRows='';
+  ['normal','reverse','holo','firstEdition'].forEach(k=>{
+    if(variantsAvail[k]){ const usd=varUsd(k);
+      const soles=(usd!=null)?(usd*fxUsd()):null;
+      variantRows+='<tr><td>'+(VAR_ES[k]||k)+'</td><td class="num">'+(usd!=null?('$'+usd.toFixed(2)):'—')+'</td><td class="num">'+(soles!=null?('S/ '+soles.toFixed(2)):'—')+'</td></tr>';
+    }
+  });
+  // fallback: si no hubo flags de variants pero sí precios por clave TCGplayer
+  if(!variantRows){ Object.keys(tcg).forEach(k=>{ if(k==='updated'||k==='unit')return; const v=tcg[k];
+    const usd=(v&&v.marketPrice!=null)?v.marketPrice:(v&&v.midPrice!=null?v.midPrice:null);
+    const soles=(usd!=null)?(usd*fxUsd()):null;
+    variantRows+='<tr><td>'+(VAR_ES[k]||k)+'</td><td class="num">'+(usd!=null?('$'+usd.toFixed(2)):'—')+'</td><td class="num">'+(soles!=null?('S/ '+soles.toFixed(2)):'—')+'</td></tr>'; }); }
+  const variantsHTML = variantRows
+    ? '<div class="matks"><h3 style="font-size:0.95rem;margin-bottom:9px">🎴 Versiones disponibles</h3>'+
+      '<table class="btable"><thead><tr><th>Versión</th><th style="text-align:right">USD</th><th style="text-align:right">Soles</th></tr></thead><tbody>'+variantRows+'</tbody></table></div>'
+    : '';
   const atks=(d.attacks||[]).map(a=>'<div class="matk"><div class="aname"><b>'+(a.name||'')+'</b>'+(a.damage?'<span class="admg">'+a.damage+'</span>':'')+'</div>'+(a.effect?'<div>'+a.effect+'</div>':'')+'</div>').join('');
   const owned=(store.get()[card.id]||{}).type;
   modalEl.innerHTML='<button class="close-x">×</button>'+
     '<div class="mtop">'+
       '<div class="mimg-wrap"><div class="mimg" id="tilt">'+imgTag(card.image,card.name)+'<div class="shine"></div><div class="glare"></div></div></div>'+
-      '<div class="minfo"><h2>'+card.name+'</h2>'+
+      '<div class="minfo"><h2 id="m-title">'+card.name+'</h2>'+
         '<div class="msub">'+(card.set||'')+' · #'+(card.localId||'?')+(d.stage?' · '+d.stage:'')+'</div>'+
+        namesHTML+
+        langBar+
         (chips?'<div class="mchips">'+chips+'</div>':'')+
         (d.hp?'<div class="mrow"><span class="lbl">HP</span><span>'+d.hp+'</span></div>':'')+
         (d.illustrator?'<div class="mrow"><span class="lbl">🎨 Ilustrador</span><span>'+d.illustrator+'</span></div>':'')+
         ((d.weaknesses&&d.weaknesses.length)?'<div class="mrow"><span class="lbl">Debilidad</span><span>'+d.weaknesses.map(w=>(TYPE_ES[w.type]||w.type)+' '+(w.value||'')).join(', ')+'</span></div>':'')+
         (d.retreat!=null?'<div class="mrow"><span class="lbl">Retirada</span><span>'+d.retreat+'</span></div>':'')+
         '<div class="mprice"><div class="big">'+(conv.live?'S/ '+conv.soles.toFixed(2):'~S/ '+conv.soles.toFixed(2))+'</div>'+
+          (conv.live&&priceMultiLine(conv)?'<div class="multi">'+priceMultiLine(conv)+'</div>':'')+
           '<div class="mtrend">'+conv.label+(trend?' · '+trend:'')+'</div>'+
           (pr&&pr.holofoil?'<div class="mtrend">TCGplayer: bajo $'+pr.holofoil.lowPrice+' · mercado $'+pr.holofoil.marketPrice+' · alto $'+pr.holofoil.highPrice+'</div>':'')+'</div>'+
       '</div>'+
     '</div>'+
+    variantsHTML+
     (atks?'<div class="matks"><h3 style="font-size:0.95rem;margin-bottom:9px">⚔️ Ataques</h3>'+atks+'</div>':'')+
     '<div id="poke-slot">'+(LIVE?'<div class="poke-loading">🎮 Cargando datos de combate…</div>':'')+'</div>'+
     '<div class="mact"><button class="m-mine">'+(owned==='mine'?'⭐ Ya es mía':'⭐ Añadir a mi colección')+'</button>'+
@@ -966,6 +1134,22 @@ async function openDetail(card){
   modalEl.querySelector('.close-x').addEventListener('click',closeModal);
   modalEl.querySelector('.m-mine').addEventListener('click',()=>{ addCard(card,'mine'); closeModal(); });
   modalEl.querySelector('.m-gift').addEventListener('click',()=>{ addCard(card,'gift'); closeModal(); });
+  // selector de idioma: cambia imagen + título de la carta al idioma elegido
+  const seg=modalEl.querySelector('#lang-seg');
+  if(seg){ seg.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',async ()=>{
+    seg.querySelectorAll('button').forEach(x=>x.classList.remove('on')); btn.classList.add('on');
+    const lang=btn.dataset.lang;
+    const mimg=modalEl.querySelector('#tilt');
+    if(mimg){ const newBase=imgBaseForLang(card.image,lang);
+      // reconstruye la imagen con la base del idioma (mantiene shine/glare)
+      mimg.innerHTML=imgTag(newBase,card.name)+'<div class="shine"></div><div class="glare"></div>'; }
+    // título en el idioma elegido (si lo tenemos o lo pedimos)
+    const title=modalEl.querySelector('#m-title');
+    if(title){ const cached=(cardLangName[card.id]||{})[lang];
+      if(cached){ title.textContent=cached; }
+      else { const nm=await fetchCardName(card.id,lang); if(nm && modalBg.classList.contains('open')) title.textContent=nm; }
+    }
+  })); }
   const slot=modalEl.querySelector('#poke-slot');
   if(slot && LIVE){ fetchPoke(card.name).then(pk=>{ if(!modalBg.classList.contains('open'))return;
     const cur=modalEl.querySelector('#poke-slot'); if(!cur)return;
@@ -1377,6 +1561,93 @@ async function renderWiki(name){
     q.addEventListener('input',e=>{ clearTimeout(t); const v=e.target.value.trim(); if(v.length<3)return; t=setTimeout(()=>renderWiki(v),500); });
     q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ clearTimeout(t); const v=e.target.value.trim(); if(v)renderWiki(v); } });
   }
+})();
+// ===== COBBLEMON (mod de Minecraft) — datos de referencia offline =====
+const COBBLEMON_INFO = {
+  version: 'Cobblemon (Minecraft Java · Fabric/Forge/NeoForge)',
+  basics: [
+    ['Captura','Lánzale una Poké Ball a un Pokémon salvaje. Debilitarlo primero (bajarle HP y dormir/paralizar) sube la probabilidad.'],
+    ['Combate','Los Pokémon suben de nivel combatiendo contra salvajes o de otros jugadores; aprenden movimientos al subir de nivel.'],
+    ['Curación','Usa una Healing Machine (se fabrica y se alimenta con Redstone) para curar todo tu equipo.'],
+    ['PC','Los Pokémon extra van a tu PC; accede desde una PC de Cobblemon para organizar cajas.'],
+    ['Spawns','Aparecen según bioma, hora del día, altura y clima. Cambia con Y (subterráneo, superficie, cielo).']
+  ],
+  balls: [
+    ['Poké Ball','Estándar. Se fabrica con Apricorns (bayas) + base metálica.'],
+    ['Great Ball','Mejor tasa que la Poké Ball.'],
+    ['Ultra Ball','Alta tasa de captura general.'],
+    ['Dusk Ball','Mejor de noche o en cuevas.'],
+    ['Net Ball','Mejor contra tipo Agua y Bicho.'],
+    ['Dive Ball','Mejor bajo el agua.'],
+    ['Timer Ball','Mejora cuantos más turnos pasan.'],
+    ['Quick Ball','Muy efectiva en el primer turno.']
+  ],
+  apricorns: ['Rojo → Poké Ball','Amarillo → variantes','Verde','Azul','Rosa','Blanco','Negro — se cultivan de árboles de Apricorn y se secan.'],
+  // spawns por bioma (curado, representativo — no es la lista completa del mod)
+  spawns: [
+    {mon:'Charmander', biomes:['Cuevas','Nether (cercanías)','Zonas rocosas cálidas'], time:'Día', dex:4},
+    {mon:'Bulbasaur', biomes:['Selva/Jungla','Bosque frondoso'], time:'Día', dex:1},
+    {mon:'Squirtle', biomes:['Ríos','Playas','Pantanos'], time:'Cualquiera', dex:7},
+    {mon:'Pikachu', biomes:['Bosque','Llanura','Bosque de flores'], time:'Día', dex:25},
+    {mon:'Eevee', biomes:['Llanura','Bosque','Aldeas'], time:'Día', dex:133},
+    {mon:'Gastly', biomes:['Cuevas','Bosque oscuro'], time:'Noche', dex:92},
+    {mon:'Magikarp', biomes:['Ríos','Océanos','Estanques'], time:'Cualquiera', dex:129},
+    {mon:'Geodude', biomes:['Montañas','Cuevas'], time:'Cualquiera', dex:74},
+    {mon:'Snorlax', biomes:['Selva','Bosque (raro)'], time:'Cualquiera', dex:143},
+    {mon:'Dratini', biomes:['Ríos profundos','Océanos'], time:'Cualquiera (raro)', dex:147},
+    {mon:'Growlithe', biomes:['Sabana','Zonas cálidas'], time:'Día', dex:58},
+    {mon:'Machop', biomes:['Montañas','Colinas'], time:'Día', dex:66}
+  ],
+  // evoluciones típicas dentro del mod
+  evos: [
+    ['Charmander → Charmeleon → Charizard','Nivel 16 y 36'],
+    ['Bulbasaur → Ivysaur → Venusaur','Nivel 16 y 32'],
+    ['Squirtle → Wartortle → Blastoise','Nivel 16 y 36'],
+    ['Pikachu → Raichu','Piedra Trueno'],
+    ['Eevee → Vaporeon / Jolteon / Flareon','Piedra Agua / Trueno / Fuego'],
+    ['Eevee → Espeon / Umbreon','Alta amistad de día / de noche'],
+    ['Gastly → Haunter → Gengar','Nivel 25 y luego por intercambio (o link cable)'],
+    ['Machop → Machoke → Machamp','Nivel 28 y luego por intercambio']
+  ],
+  links: [
+    {t:'Wiki oficial de Cobblemon', u:'https://wiki.cobblemon.com/'},
+    {t:'Spawns por bioma (wiki)', u:'https://wiki.cobblemon.com/index.php/Spawning'},
+    {t:'Sitio oficial', u:'https://cobblemon.com/'}
+  ]
+};
+function cobFilter(list, q){ if(!q) return list; const s=q.toLowerCase();
+  return list.filter(x=> (x.mon&&x.mon.toLowerCase().includes(s)) || (x.biomes&&x.biomes.join(' ').toLowerCase().includes(s)) ); }
+let cobQuery='';
+function renderCobblemon(){
+  const box=document.getElementById('cob-content'); if(!box) return;
+  const chips=document.getElementById('cob-chips');
+  if(chips && !chips.dataset.init){ chips.dataset.init='1';
+    ['Charmander','Pikachu','Eevee','jungla','montaña','noche'].forEach(n=>{ const b=document.createElement('button'); b.className='chip'; b.textContent=n;
+      b.addEventListener('click',()=>{ document.getElementById('cob-q').value=n; cobQuery=n; renderCobblemon(); }); chips.appendChild(b); }); }
+  const CI=COBBLEMON_INFO;
+  const spawns=cobFilter(CI.spawns, cobQuery);
+  const spawnRows=spawns.map(s=>'<tr><td>'+s.mon+' <span style="color:var(--muted)">#'+s.dex+'</span></td><td>'+s.biomes.join(', ')+'</td><td>'+s.time+'</td></tr>').join('') || '<tr><td colspan="3" style="color:var(--muted)">Sin coincidencias.</td></tr>';
+  box.innerHTML=
+    '<div class="wiki-block"><h3>🎒 Básicos del mod</h3>'+
+      CI.basics.map(b=>'<div class="wiki-ability"><b>'+b[0]+'</b><div class="desc">'+b[1]+'</div></div>').join('')+
+    '</div>'+
+    '<div class="wiki-block"><h3>🗺️ Spawns por bioma</h3>'+
+      '<div style="overflow-x:auto"><table class="wiki-moves"><thead><tr><th>Pokémon</th><th>Biomas</th><th>Horario</th></tr></thead><tbody>'+spawnRows+'</tbody></table></div>'+
+    '</div>'+
+    '<div class="wiki-block"><h3>🧬 Evoluciones típicas</h3>'+
+      CI.evos.map(e=>'<div class="wiki-ability"><b>'+e[0]+'</b><div class="desc">'+e[1]+'</div></div>').join('')+
+    '</div>'+
+    '<div class="wiki-block"><h3>⚪ Poké Balls y Apricorns</h3>'+
+      CI.balls.map(b=>'<div class="wiki-ability"><b>'+b[0]+'</b><div class="desc">'+b[1]+'</div></div>').join('')+
+      '<div class="desc" style="margin-top:8px"><b style="color:var(--gold)">Apricorns:</b> '+CI.apricorns.join(' · ')+'</div>'+
+    '</div>'+
+    '<div class="wiki-block"><h3>🔗 Enlaces útiles</h3>'+
+      '<div class="desc">'+CI.links.map(l=>'<a href="'+l.u+'" target="_blank" style="color:var(--cyan)">'+l.t+'</a>').join(' · ')+'</div>'+
+      '<div class="desc" style="margin-top:8px;color:var(--muted)">Cobblemon es un proyecto de la comunidad, sin relación con The Pokémon Company. Datos de referencia.</div>'+
+    '</div>';
+}
+(function initCob(){ const q=document.getElementById('cob-q');
+  if(q){ let t=null; q.addEventListener('input',e=>{ clearTimeout(t); cobQuery=e.target.value.trim(); t=setTimeout(renderCobblemon,180); }); }
 })();
 refreshStats(); paintBanner();
 probe().then(()=>{ Object.values(store.get()).forEach(c=>fetchPrice(c.id,c.name).then(refreshStats)); });
