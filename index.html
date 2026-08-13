@@ -69,7 +69,7 @@
   body.day .stars { opacity: 0; }
   .theme-toggle { font: inherit; font-weight: bold; font-size: 0.8rem; padding: 9px 15px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; box-shadow: var(--shadow); white-space: nowrap; }
   .theme-toggle:active { transform: translateY(2px); }
-  .brand h1 .mode-word { color: var(--violet); -webkit-text-fill-color: var(--violet); }
+  .brand h1 .mode-word { -webkit-text-fill-color:#fff; color:#fff; }
   body.day .brand h1 .mode-word { color: #fff; -webkit-text-fill-color: #fff; }
   body.day .moon { background: radial-gradient(circle at 38% 35%, #fff3d6, #ffd27a 55%, #f0993a); box-shadow: 0 0 30px rgba(255,180,90,0.7), inset -5px -5px 0 rgba(200,120,40,0.15); }
   body.day .moon::after { display: none; }
@@ -85,7 +85,6 @@
     text-shadow: 0 0 4px #fff, 0 0 12px var(--violet), 0 0 26px var(--violet), 0 0 40px var(--violet-deep), 0 0 2px var(--cyan);
     animation: neonflick 4.5s infinite alternate; }
   @keyframes neonflick { 0%,18%,22%,60%,100%{opacity:1} 19%,21%{opacity:0.55} 61%{opacity:0.8} }
-  .brand h1 .mode-word { -webkit-text-fill-color:#fff; color:#fff; }
   .brand p { font-size: 0.76rem; color: var(--muted); margin-top: 4px; letter-spacing: 0.3px; }
   .tabs { display: flex; gap: 5px; background: var(--panel); padding: 5px; border-radius: 14px; border: 1px solid var(--line); box-shadow: var(--shadow); flex-wrap: wrap; }
   .tab { border: none; background: transparent; font: inherit; font-weight: bold; font-size: 0.8rem; padding: 9px 15px; border-radius: 10px; cursor: pointer; color: var(--muted); transition: all 0.18s; white-space: nowrap; }
@@ -367,7 +366,7 @@
   @media (max-width: 820px) { .stats-row { grid-template-columns: repeat(3, minmax(0,1fr)); } .budget-grid { grid-template-columns: 1fr; } }
   @media (max-width: 520px) { .stats-row { grid-template-columns: 1fr 1fr; } .brand h1 { font-size: 1.3rem; }
     #results.p5nav .pcard.focus { transform: scale(1.06) rotate(-1deg); box-shadow: 4px 5px 0 var(--coral); }
-    #results.p5nav .pcard.focus::after { display:none; } /* la flecha lateral estorba en móvil */
+    #results.p5nav .pcard.focus::after { display:none; }
     #results.p5nav .pcard { opacity:0.72; } }
   @media print { .tabs, .search-bar, .chips, .filters, .pcard .act, .seg, .gift-controls, .mode-banner, .fx-bar, .io-row, .modal-bg { display: none !important; } .panel { display: block !important; } body { background: #fff; color: #000; } }
   .wiki-block { background: linear-gradient(160deg, var(--panel), var(--bg2)); border:1px solid var(--line); border-radius:18px; padding:18px 20px; margin-bottom:16px; box-shadow:var(--shadow); position:relative; overflow:hidden; }
@@ -699,25 +698,23 @@
 </div>
 
 <script>
-// API multi-idioma: base + endpoints por idioma (ES / EN / JA)
 const API_BASE = 'https://api.tcgdex.net/v2';
-const API = API_BASE + '/es';                 // idioma principal (compat.)
+const API = API_BASE + '/es';
 const API_ES = API_BASE + '/es';
 const API_EN = API_BASE + '/en';
 const API_JA = API_BASE + '/ja';
-const SEARCH_LANGS = [API_ES, API_EN, API_JA]; // se fusionan al buscar en vivo
-// idiomas disponibles para ver la carta (imagen + nombre reales)
+const SEARCH_LANGS = [API_ES, API_EN, API_JA];
 const LANGS = [
   {code:'es',flag:'🇪🇸'},{code:'en',flag:'🇬🇧'},{code:'ja',flag:'🇯🇵'},
   {code:'fr',flag:'🇫🇷'},{code:'de',flag:'🇩🇪'},{code:'it',flag:'🇮🇹'},{code:'pt',flag:'🇵🇹'}
 ];
-// cambia el segmento de idioma de una URL de imagen de TCGdex
+
 function imgBaseForLang(base, lang){
   if(!base) return base;
   return base.replace(/\/(es|en|ja|fr|de|it|pt|ko|zh-tw|zh-cn|id|th|nl|pl|ru)\//, '/'+lang+'/');
 }
-// caché de nombres por carta e idioma consultado on-demand
-const cardLangName = {}; // cardLangName[id] = {es:..., en:..., fr:...}
+
+const cardLangName = {};
 async function fetchCardName(id, lang){
   cardLangName[id]=cardLangName[id]||{};
   if(cardLangName[id][lang]!==undefined) return cardLangName[id][lang];
@@ -726,7 +723,7 @@ async function fetchCardName(id, lang){
   }catch(e){}
   cardLangName[id][lang]=null; return null;
 }
-// caché de nombres por idioma: nameCache[id] = {es,en,ja}
+
 const nameCache = {};
 function estBySlug(name) {
   const n=(name||'').toLowerCase();
@@ -742,8 +739,7 @@ function klassOf(name){
   return 'base';
 }
 const QUICK=["Sylveon","Greninja","Chandelure","Rotom","Toxtricity","Sableye","Swampert"];
-// Catálogo de respaldo: cartas reales que TCGdex aún no tiene indexadas.
-// Imagen desde LimitlessTCG (CDN público). Se fusionan en la búsqueda.
+
 const FALLBACK_CATALOG=[
   {id:"svp-243", name:"Toxtricity ex", localId:"243/SV-P", set:"Illustration Contest 2024 (JP Promo)",
    image:"https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpc/SVP/SVP_243_R_JP.png",
@@ -752,8 +748,9 @@ const FALLBACK_CATALOG=[
    manual:{types:["Lightning"], rarity:"Promo", hp:260, stage:"Stage 1", evolveFrom:"Toxel (エレズン)", illustrator:"Anderson",
      attacks:[{name:"ストラムサンダー (Storm Thunder)",damage:"240",effect:"Descarta 2 Energías de este Pokémon."}],
      weaknesses:[{type:"Fighting",value:"×2"}], retreat:2,
-     note:"Promo japonesa del Illustration Contest 2024. No está en TCGdex; datos de LimitlessTCG."}}
+     note:"Promo japonesa del Illustration Contest 2024."}}
 ];
+
 const CATALOG=[
   {id:"sv08-086",name:"Sylveon ex",localId:"086",set:"Surging Sparks",image:"https://assets.tcgdex.net/es/sv/sv08/086"},
   {id:"sv08.5-041",name:"Sylveon ex",localId:"041",set:"Prismatic Evolutions",image:"https://assets.tcgdex.net/es/sv/sv08.5/041"},
@@ -812,12 +809,11 @@ let lastResults=[];
 const store={ get(){ try{return JSON.parse(localStorage.getItem('alonso_ns')||'{}');}catch(e){return {};} }, set(d){ localStorage.setItem('alonso_ns', JSON.stringify(d)); } };
 
 function imgTag(base,name,extra){ if(!base && !(extra&&extra.length))return '<div class="img-ph">🃏</div>';
-  // candidatos: formato (high/low, webp/png) y también idioma alterno (en) por si /es no tiene la imagen
   const bases=base?[base]:[];
   if(base){ const enBase=base.replace('/es/','/en/'); if(enBase!==base) bases.push(enBase); }
   const c=[];
   bases.forEach(b=>{ if(b.startsWith('https://assets.tcgdex.net')) c.push(b+'/high.webp',b+'/high.png',b+'/low.webp',b+'/low.png'); else c.push(b); });
-  if(extra&&extra.length) extra.forEach(u=>c.push(u)); // imágenes de respaldo (otros CDNs)
+  if(extra&&extra.length) extra.forEach(u=>c.push(u));
   if(!c.length) return '<div class="img-ph">🃏</div>';
   return '<img loading="lazy" src="'+c[0]+'" alt="'+(name||'').replace(/"/g,'&quot;')+'" data-cands="'+c.join('|')+'" data-i="0" onerror="imgFallback(this)">'; }
 function imgFallback(img){ const c=(img.dataset.cands||'').split('|'); let i=parseInt(img.dataset.i||'0',10)+1;
@@ -828,20 +824,17 @@ function fxEur(){ return parseFloat(document.getElementById('fx-eur').value)||4.
 function priceToSoles(card){ const p=priceCache[card.id];
   if(p&&!p.est){
     const usd=(p.usd!=null)?p.usd:null, eur=(p.eur!=null)?p.eur:null;
-    // soles: preferimos USD (TCGplayer), si no EUR (Cardmarket)
     let soles, label;
     if(usd!=null){ soles=usd*fxUsd(); label='US$ '+usd.toFixed(2)+' · TCGplayer'; }
     else { soles=eur*fxEur(); label='€ '+eur.toFixed(2)+' · Cardmarket'; }
     return {soles, label, live:true, usd, eur}; }
   return {soles:estBySlug(card.name),label:'estimado por rareza',live:false,usd:null,eur:null}; }
-// texto compacto de precios en 3 monedas (S/ · US$ · €)
 function priceMultiLine(conv){
   const parts=[];
   if(conv.usd!=null) parts.push('US$ '+conv.usd.toFixed(2));
   if(conv.eur!=null) parts.push('€ '+conv.eur.toFixed(2));
   return parts.join(' · ');
 }
-// línea compacta con nombres EN / JA (si los tenemos cacheados)
 function altNamesHTML(id){
   const nc=nameCache[id]; if(!nc) return '';
   const bits=[];
@@ -860,12 +853,10 @@ async function fetchDetail(id){
     if(pr.tcgplayer){const t=pr.tcgplayer;const v=t.holofoil||t.normal||t.reverse||t.holo||null; if(v&&v.marketPrice!=null)usd=v.marketPrice; else if(v&&v.midPrice!=null)usd=v.midPrice;}
     if(pr.cardmarket){ const cm=pr.cardmarket; if(cm.avg!=null)eur=cm.avg; else if(cm.trend!=null)eur=cm.trend; }
     priceCache[id]=(usd!=null||eur!=null)?{usd,eur,src:'live'}:{est:true};
-    // nombre ES ya lo tenemos; pedimos EN y JA en paralelo (sin bloquear precio)
     fetchNames(id, d.name);
     return; } }catch(e){}
   priceCache[id]=priceCache[id]||{est:true}; metaCache[id]=metaCache[id]||{rarity:'',types:[],era:eraOf(id)};
 }
-// Trae los nombres de la carta en ES/EN/JA y los cachea
 async function fetchNames(id, esName){
   if(nameCache[id]&&nameCache[id].en&&nameCache[id].ja) return nameCache[id];
   const cur=nameCache[id]||{}; if(esName)cur.es=esName;
@@ -884,7 +875,6 @@ function fetchPrice(id,name){ return fetchDetail(id).then(()=>priceCache[id]); }
 function fetchMeta(id,name){ return fetchDetail(id).then(()=>metaCache[id]||{rarity:'',types:[],era:eraOf(id)}); }
 
 async function probe(){
-  // sondeo más robusto: probamos varios endpoints hasta que uno responda
   const targets=[API_ES+'/cards?name=pikachu', API_EN+'/cards?name=pikachu', API_ES+'/series'];
   for(const url of targets){
     try{ const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),6000);
@@ -896,7 +886,7 @@ async function probe(){
 }
 function paintBanner(){ const b=document.getElementById('mode-banner'),t=document.getElementById('mode-text');
   if(LIVE){b.className='mode-banner live';t.innerHTML='<b>En vivo.</b> Buscas TODO el catálogo (ES + EN + JA fusionados) con precios reales en 3 monedas.';}
-  else{b.className='mode-banner local';t.innerHTML='<b>Modo catálogo.</b> Tus Pokémon precargados; precios por estimador. Ábrelo fuera de Dia para todo en vivo.';} }
+  else{b.className='mode-banner local';t.innerHTML='<b>Modo catálogo.</b> Tus Pokémon precargados; precios por estimador.';} }
 
 document.querySelectorAll('.tab').forEach(t=>{ t.addEventListener('click',()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
@@ -943,12 +933,12 @@ QUICK.forEach(name=>{ const c=document.createElement('button');c.className='chip
 document.getElementById('surprise').addEventListener('click',async ()=>{
   document.querySelector('.tab[data-panel=buscar]').click();
   if(LIVE){
-    const seed=PACK_SEEDS[Math.floor(Math.random()*PACK_SEEDS.length)];
+    const seed=QUICK[Math.floor(Math.random()*QUICK.length)];
     try{ const r=await fetch(API+'/cards?name='+seed);
       if(r.ok){ const d=await r.json();
         if(Array.isArray(d)&&d.length){
           const brief=d[Math.floor(Math.random()*d.length)];
-          const card=briefToCard(brief);
+          const card={id:brief.id,name:brief.name||brief.id,localId:brief.localId||'',image:brief.image||''};
           document.getElementById('q').value=card.name; search();
           setTimeout(()=>openDetail(card),700); return;
         } } }catch(e){}
@@ -958,20 +948,17 @@ document.getElementById('surprise').addEventListener('click',async ()=>{
   setTimeout(()=>openDetail(pick),700);
 });
 
-
 const resultsEl=document.getElementById('results');
-// ===== Navegación estilo menú Persona (foco con teclado / rueda) =====
 let p5idx=0, p5cards=[];
 function p5setup(){
   p5cards=[...resultsEl.querySelectorAll('.pcard')];
   if(!p5cards.length){ resultsEl.classList.remove('p5nav'); return; }
   resultsEl.classList.add('p5nav');
-  // click en una carta la enfoca
   p5cards.forEach((el,i)=>{ el.addEventListener('mouseenter',()=>p5focus(i,false)); });
   p5idx=Math.min(p5idx, p5cards.length-1); if(p5idx<0)p5idx=0;
   p5focus(p5idx,false);
 }
-function p5cols(){ // cuántas columnas hay ahora (según ancho real)
+function p5cols(){
   if(!p5cards.length) return 1;
   const top0=p5cards[0].offsetTop; let c=0;
   for(const el of p5cards){ if(el.offsetTop===top0) c++; else break; }
@@ -983,7 +970,7 @@ function p5focus(i,scroll){
   p5cards.forEach((el,n)=>el.classList.toggle('focus', n===i));
   if(scroll!==false) p5cards[i].scrollIntoView({block:'nearest',behavior:'smooth'});
 }
-function p5move(d){ // d: 'left'/'right'/'up'/'down'
+function p5move(d){
   if(!p5cards.length) return;
   const cols=p5cols();
   if(d==='left') p5focus(p5idx-1);
@@ -991,7 +978,6 @@ function p5move(d){ // d: 'left'/'right'/'up'/'down'
   else if(d==='up') p5focus(p5idx-cols);
   else if(d==='down') p5focus(p5idx+cols);
 }
-// teclado: solo cuando el panel Buscar está activo y no escribes en un input
 document.addEventListener('keydown',e=>{
   const buscar=document.getElementById('p-buscar');
   if(!buscar||!buscar.classList.contains('active')||!p5cards.length) return;
@@ -1001,53 +987,45 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='ArrowRight'){ e.preventDefault(); p5move('right'); }
   else if(e.key==='ArrowUp'){ e.preventDefault(); p5move('up'); }
   else if(e.key==='ArrowDown'){ e.preventDefault(); p5move('down'); }
-  else if(e.key==='Enter'){ const c=findCard(p5cards[p5idx]&&p5cards[p5idx].dataset.cid); if(p5cards[p5idx]){ const img=p5cards[p5idx].querySelector('.imgbox'); if(img)img.click(); } }
+  else if(e.key==='Enter'){ if(p5cards[p5idx]){ const img=p5cards[p5idx].querySelector('.imgbox'); if(img)img.click(); } }
 });
-// rueda: NO robamos el scroll de la página. Solo movemos el foco con desplazamiento
-// horizontal real de trackpad (deltaX) y dejamos el scroll vertical libre.
 let _wheelLock=0;
 resultsEl.addEventListener('wheel',e=>{
   if(!p5cards.length) return;
-  // gesto horizontal claro de trackpad → mover foco, sin bloquear la página
   if(Math.abs(e.deltaX)>Math.abs(e.deltaY)+4){
     const now=Date.now(); if(now-_wheelLock<180) return; _wheelLock=now;
     p5move(e.deltaX>0?'right':'left');
   }
-  // scroll vertical: se deja pasar (la página baja/sube normal). No preventDefault.
 },{passive:true});
-// TÁCTIL (celular): swipe horizontal cambia de carta; swipe vertical = scroll normal
+
 let _tx=0,_ty=0,_tmoved=false;
 resultsEl.addEventListener('touchstart',e=>{ const t=e.touches[0]; _tx=t.clientX; _ty=t.clientY; _tmoved=false; },{passive:true});
 resultsEl.addEventListener('touchmove',e=>{ if(!p5cards.length||_tmoved)return; const t=e.touches[0];
   const dx=t.clientX-_tx, dy=t.clientY-_ty;
   if(Math.abs(dx)>44 && Math.abs(dx)>Math.abs(dy)*1.4){ _tmoved=true; p5move(dx<0?'right':'left'); }
 },{passive:true});
+
 function localSearch(q){ const s=q.toLowerCase();
   const base=CATALOG.filter(c=>c.name.toLowerCase().includes(s));
   const fb=fallbackMatches(q); return dedupById(base.concat(fb)); }
-// coincidencias del catálogo manual de respaldo (por nombre, número o id)
 function fallbackMatches(q){ const s=q.toLowerCase();
   return FALLBACK_CATALOG.filter(c=>
     c.name.toLowerCase().includes(s) ||
     (c.localId&&String(c.localId).toLowerCase().includes(s)) ||
-    (c.id&&c.id.toLowerCase().includes(s)) ||
-    (c.names&&Object.values(c.names).some(n=>n&&n.toLowerCase().includes(s)))
+    (c.id&&c.id.toLowerCase().includes(s))
   ); }
-// registra una carta de respaldo en las cachés para que se muestre con sus datos manuales
 function registerFallback(c){
   if(c.names){ nameCache[c.id]=Object.assign({}, nameCache[c.id], c.names);
     cardLangName[c.id]=Object.assign({}, cardLangName[c.id], c.names); }
   if(c.manual){ metaCache[c.id]={rarity:c.manual.rarity||'',types:c.manual.types||[],era:eraOf(c.id),full:Object.assign({},c.manual,{name:c.name,localId:c.localId,set:{name:c.set}})}; }
-  // sin precio en vivo: dejamos estimador por rareza
   priceCache[c.id]=priceCache[c.id]||{est:true};
 }
 function dedupById(arr){ const seen={}; return (arr||[]).filter(c=>{ if(!c||!c.id||seen[c.id])return false; seen[c.id]=1; return true; }); }
+
 async function search(){ const q=document.getElementById('q').value.trim(); if(!q)return; const local=localSearch(q);
-  // registra respaldos que coincidan (para tener nombres/meta listos)
   fallbackMatches(q).forEach(registerFallback);
   if(LIVE){ resultsEl.innerHTML='<div class="loading"><div class="spinner"></div>Buscando "'+q+'" en ES · EN · JA…</div>';
     try{
-      // Buscamos el mismo término en los 3 idiomas y fusionamos por id
       const results=await Promise.all(SEARCH_LANGS.map(base=>
         fetch(base+'/cards?name='+encodeURIComponent(q)).then(r=>r.ok?r.json():[]).catch(()=>[])
       ));
@@ -1055,26 +1033,21 @@ async function search(){ const q=document.getElementById('q').value.trim(); if(!
       results.forEach((arr,li)=>{ if(!Array.isArray(arr))return;
         arr.forEach(b=>{ if(!b||!b.id)return;
           if(!merged[b.id]) merged[b.id]={id:b.id,name:b.name,localId:(b.localId!=null?String(b.localId):''),set:'',image:b.image||''};
-          // guardamos el nombre en su idioma para mostrarlo trilingüe
           const nc=nameCache[b.id]||{}; nc[langKey[li]]=b.name; nameCache[b.id]=nc;
-          // preferimos nombre ES para el título de la tarjeta
           if(li===0 && b.name) merged[b.id].name=b.name;
           if(!merged[b.id].image && b.image) merged[b.id].image=b.image;
         });
       });
-      // dedup extra: colapsa cartas idénticas (mismo id ya está; además mismo set+número+nombre)
       const seenKey={}; const data=[];
       Object.values(merged).forEach(c=>{
-        const key=c.id; // el id ya es único por carta/idioma; garantizamos 1 sola entrada por id
-        if(seenKey[key]) return; seenKey[key]=1;
+        if(seenKey[c.id]) return; seenKey[c.id]=1;
         data.push(c);
       });
-      // añade cartas del catálogo de respaldo que TCGdex no tiene (ej. Toxtricity 243/SV-P)
       fallbackMatches(q).forEach(c=>{ if(!seenKey[c.id]){ seenKey[c.id]=1; data.push(c); } });
       if(data.length){ renderResults(data); return; }
     }catch(e){} }
   if(local.length)renderResults(local);
-  else resultsEl.innerHTML='<div class="empty">No hay cartas de "'+q+'" en el catálogo local.'+(LIVE?'':' Ábrelo fuera de Dia para búsqueda completa.')+'</div>'; }
+  else resultsEl.innerHTML='<div class="empty">No hay cartas de "'+q+'" en el catálogo local.</div>'; }
 document.getElementById('go').addEventListener('click',search);
 let searchTimer=null;
 document.getElementById('q').addEventListener('keydown',e=>{ if(e.key==='Enter'){clearTimeout(searchTimer);search();} });
@@ -1089,7 +1062,6 @@ function priceBlockHTML(card){ const p=priceCache[card.id]; if(!p)return '<span 
   return '<span class="pe-soles pe-est">~S/ '+conv.soles.toFixed(2)+'</span><div class="pe-src">'+conv.label+'</div>'; }
 function attachPrice(el,card){ const pb=el.querySelector('.price-block'); if(!pb)return; pb.dataset.cid=card.id;
   fetchPrice(card.id,card.name).then(()=>{pb.innerHTML=priceBlockHTML(card);refreshStats();});
-  // cuando lleguen los nombres EN/JA, refrescamos la línea de idiomas de la tarjeta
   if(LIVE){ fetchNames(card.id, card.name).then(()=>{ const alt=el.querySelector('.nm-alt'); const html=altNamesHTML(card.id);
     if(html){ if(alt){ alt.outerHTML=html; } else { const nm=el.querySelector('.nm'); if(nm) nm.insertAdjacentHTML('afterend', html); } } }); }
 }
@@ -1101,7 +1073,6 @@ function sortResults(list,mode){ const a=[...list];
   return a; }
 
 function renderResults(cards){
-  // dedup defensivo por id (evita duplicados vengan de donde vengan)
   const _seen={}; lastResults=(cards||[]).filter(c=>{ if(!c||!c.id) return false; if(_seen[c.id]) return false; _seen[c.id]=1; return true; });
   const col=store.get();
   ensureMeta(lastResults,()=>{ populateFilterOptions();
@@ -1208,7 +1179,6 @@ const modalBg=document.getElementById('modal-bg'), modalEl=document.getElementBy
 modalBg.addEventListener('click',e=>{ if(e.target===modalBg)closeModal(); });
 function closeModal(){ modalBg.classList.remove('open'); }
 
-// ===== PokéAPI: datos de combate (sprite animado PvP, stats, Pokédex) =====
 const POKEAPI='https://pokeapi.co/api/v2';
 const pokeCache={};
 const STAT_ES={hp:'HP','attack':'Ataque','defense':'Defensa','special-attack':'At. Esp.','special-defense':'Def. Esp.','speed':'Velocidad'};
@@ -1270,7 +1240,6 @@ async function openDetail(card){
     (nc.en?'<span><b>EN:</b> '+nc.en+'</span>':'')+
     (nc.ja?'<span><b>JA:</b> '+nc.ja+'</span>':'')+
   '</div>';
-  // barra selector de idioma real: cambia imagen + nombre de la carta
   const langBar='<div class="lang-seg" id="lang-seg" style="margin:2px 0 12px">'+
     LANGS.map((L,i)=>'<button data-lang="'+L.code+'"'+(i===0?' class="on"':'')+'>'+L.flag+' '+L.code.toUpperCase()+'</button>').join('')+
   '</div>';
@@ -1281,16 +1250,13 @@ async function openDetail(card){
     trend='Tendencia 7d: €'+(cm.avg7!=null?cm.avg7.toFixed(2):'—')+' · 30d: €'+(cm.avg30!=null?cm.avg30.toFixed(2):'—'); }
   const chips=((m.types||[]).map(t=>{const es=TYPE_ES[t]||t;return '<span class="mchip tchip-'+es+'">'+es+'</span>';}).join(''))+
     (m.rarity?'<span class="mchip tchip-rar">'+m.rarity+'</span>':'');
-  // ==== Versiones disponibles (normal, reverse, holo, 1ª edición) con precio por versión ====
   const VAR_ES={normal:'Normal',reverse:'Reverse Holo',holo:'Holo',firstEdition:'1.ª Edición',
     'reverse-holofoil':'Reverse Holo','holofoil':'Holo','1st-edition':'1.ª Edición','1st-edition-holofoil':'1.ª Ed. Holo','unlimited':'Ilimitada','unlimited-holofoil':'Ilim. Holo'};
   const tcg=(d.pricing&&d.pricing.tcgplayer)||{};
   const cm=(d.pricing&&d.pricing.cardmarket)||{};
   const variantsAvail = d.variants || {};
-  // USD (TCGplayer) por versión
   function varUsd(key){ const alt={normal:'normal',reverse:'reverse-holofoil',holo:'holofoil',firstEdition:'1st-edition'};
     const v=tcg[key]||tcg[alt[key]]; if(v&&v.marketPrice!=null)return v.marketPrice; if(v&&v.midPrice!=null)return v.midPrice; if(v&&v.lowPrice!=null)return v.lowPrice; return null; }
-  // EUR (Cardmarket) por versión: holo usa *-holo, el resto el promedio normal
   function varEur(key){ if(key==='holo'||key==='firstEdition'){ if(cm['avg-holo']!=null)return cm['avg-holo']; if(cm['trend-holo']!=null)return cm['trend-holo']; }
     if(cm.avg!=null)return cm.avg; if(cm.trend!=null)return cm.trend; return null; }
   function rowFor(label,usd,eur){
@@ -1303,7 +1269,6 @@ async function openDetail(card){
   ['normal','reverse','holo','firstEdition'].forEach(k=>{
     if(variantsAvail[k]){ variantRows+=rowFor(VAR_ES[k]||k, varUsd(k), varEur(k)); }
   });
-  // fallback: si no hubo flags de variants pero sí precios por clave TCGplayer
   if(!variantRows){ Object.keys(tcg).forEach(k=>{ if(k==='updated'||k==='unit')return; const v=tcg[k];
     const usd=(v&&v.marketPrice!=null)?v.marketPrice:(v&&v.midPrice!=null?v.midPrice:null);
     const isHolo=/holo/i.test(k)&&!/reverse/i.test(k);
@@ -1340,16 +1305,13 @@ async function openDetail(card){
   modalEl.querySelector('.close-x').addEventListener('click',closeModal);
   modalEl.querySelector('.m-mine').addEventListener('click',()=>{ addCard(card,'mine'); closeModal(); });
   modalEl.querySelector('.m-gift').addEventListener('click',()=>{ addCard(card,'gift'); closeModal(); });
-  // selector de idioma: cambia imagen + título de la carta al idioma elegido
   const seg=modalEl.querySelector('#lang-seg');
   if(seg){ seg.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',async ()=>{
     seg.querySelectorAll('button').forEach(x=>x.classList.remove('on')); btn.classList.add('on');
     const lang=btn.dataset.lang;
     const mimg=modalEl.querySelector('#tilt');
     if(mimg){ const newBase=imgBaseForLang(card.image,lang);
-      // reconstruye la imagen con la base del idioma (mantiene shine/glare)
       mimg.innerHTML=imgTag(newBase,card.name,card.fallbackImages)+'<div class="shine"></div><div class="glare"></div>'; }
-    // título en el idioma elegido (si lo tenemos o lo pedimos)
     const title=modalEl.querySelector('#m-title');
     if(title){ const cached=(cardLangName[card.id]||{})[lang];
       if(cached){ title.textContent=cached; }
@@ -1389,7 +1351,7 @@ function refreshStats(){ const all=Object.values(store.get());
   document.getElementById('s-val').innerHTML='S/ '+val.toFixed(0)+(anyEst?' <small>*</small>':''); }
 
 function applyTheme(mode){
-  const day = mode==='day'; // day = CHILL · night = TRYHARD
+  const day = mode==='day';
   document.body.classList.toggle('day', day);
   document.getElementById('mode-word').textContent = day ? 'Chill' : 'Tryhard';
   document.getElementById('theme-toggle').textContent = day ? '🌸 Chill' : '🔥 Tryhard';
@@ -1411,7 +1373,6 @@ document.getElementById('theme-toggle').addEventListener('click', ()=>{
 });
 applyTheme((function(){ try { return localStorage.getItem('alonso_theme') || 'night'; } catch(e){ return 'night'; } })());
 
-// ===== NOCHE: Binder + Sobres + Comparar + Progreso =====
 const binderStore={ get(){ try{return JSON.parse(localStorage.getItem('alonso_binder')||'[]');}catch(e){return [];} }, set(d){ localStorage.setItem('alonso_binder', JSON.stringify(d)); } };
 function addToBinder(card){ const b=binderStore.get();
   if(!b.find(x=>x.id===card.id)) b.push({id:card.id,name:card.name,localId:card.localId||'',image:card.image||'',set:card.set||''});
@@ -1502,7 +1463,7 @@ async function openPack(){
     const bestSoles=priceToSoles(best).soles;
     if(!log.best || bestSoles>log.best.soles) log.best={name:best.name,set:best.set||'',soles:bestSoles};
     packLog.set(log);
-    hint.textContent=LIVE?('✨ ¡5 cartas al azar de toda la base en tu Binder!'):('✨ ¡5 cartas añadidas! (catálogo local — ábrelo fuera de Dia para 100% random)');
+    hint.textContent=LIVE?('✨ ¡5 cartas al azar de toda la base en tu Binder!'):('✨ ¡5 cartas añadidas!');
     shareBtn.style.display='inline-block'; shareBtn._pulls=pulls;
     renderPackStats();
     setTimeout(()=>{ pack.classList.remove('ripping','gone'); packBusy=false; }, 1600);
@@ -1647,11 +1608,10 @@ function renderProgreso(){
   let rt; addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(draw,200); });
   draw();
 })();
-// ===== WIKI de mecánicas (evolución, habilidades, movimientos) =====
+
 const WIKI_QUICK=["Charizard","Pikachu","Gengar","Greninja","Sylveon","Dragonite"];
 const wikiCache={};
 
-// Trae la descripción en español (con respaldo a inglés) de una habilidad o movimiento
 function esText(entries, key){
   const arr = entries || [];
   const es = arr.filter(e => e.language && e.language.name === 'es');
@@ -1677,7 +1637,6 @@ async function fetchWiki(name){
   if(!p){ wikiCache[key]=null; return null; }
   const out = { id:p.id, name:p.name, types:(p.types||[]).map(t=>t.type.name),
     sprite:(p.sprites&&p.sprites.front_default)||null, abilities:[], moves:[], evo:[] };
-  // Habilidades (con descripción es)
   try{
     out.abilities = await Promise.all((p.abilities||[]).map(async a=>{
       const info={ slug:a.ability.name, hidden:a.is_hidden, name:a.ability.name, desc:'' };
@@ -1687,7 +1646,6 @@ async function fetchWiki(name){
       return info;
     }));
   }catch(e){}
-  // Movimientos (todos) — traducimos nombre y datos base
   try{
     out.moves = await Promise.all((p.moves||[]).map(async m=>{
       const info={ slug:m.move.name, name:m.move.name, type:'', power:null, accuracy:null, pp:null };
@@ -1698,7 +1656,6 @@ async function fetchWiki(name){
     }));
     out.moves.sort((a,b)=>(b.power||0)-(a.power||0));
   }catch(e){}
-  // Cadena evolutiva
   try{
     const rs=await fetch(POKEAPI+'/pokemon-species/'+p.id);
     if(rs.ok){ const sp=await rs.json();
@@ -1728,11 +1685,10 @@ const MVTYPE_COLOR={normal:'#a8a878',fire:'#f08030',water:'#6890f0',electric:'#f
 
 async function renderWiki(name){
   const box=document.getElementById('wiki-content');
-  if(!LIVE){ box.innerHTML='<div class="empty">La wiki necesita conexión en vivo. Ábrela fuera de Dia.</div>'; return; }
+  if(!LIVE){ box.innerHTML='<div class="empty">La wiki necesita conexión en vivo.</div>'; return; }
   box.innerHTML='<div class="loading"><div class="spinner"></div>Cargando '+name+'…</div>';
   const w=await fetchWiki(name);
-  if(!w){ box.innerHTML='<div class="empty">No encontré datos de "'+name+'". Prueba con el nombre en inglés.</div>'; return; }
-  // Evolución
+  if(!w){ box.innerHTML='<div class="empty">No encontré datos de "'+name+'".</div>'; return; }
   let evoHTML='';
   if(w.evo.length>1){
     evoHTML='<div class="wiki-block"><h3>🧬 Cadena evolutiva</h3><div class="evo-chain">'+
@@ -1740,11 +1696,9 @@ async function renderWiki(name){
         '<div class="evo-stage" data-poke="'+e.name+'"><img src="'+e.sprite+'" alt="'+e.name+'"><div class="en">'+e.name+'</div></div>').join('')+
       '</div></div>';
   }
-  // Habilidades
   const abHTML='<div class="wiki-block"><h3>⚡ Habilidades</h3>'+
     (w.abilities.length? w.abilities.map(a=>'<div class="wiki-ability"><b>'+a.name+'</b>'+(a.hidden?' <span style="font-size:0.65rem;color:var(--muted)">(oculta)</span>':'')+
       (a.desc?'<div class="desc">'+a.desc+'</div>':'')+'</div>').join('') : '<div class="desc">Sin datos.</div>')+'</div>';
-  // Movimientos
   const mvRows=w.moves.map(m=>{ const col=MVTYPE_COLOR[m.type]||'#777'; const tEs=PKTYPE_ES[m.type]||m.type||'—';
     return '<tr><td>'+m.name+'</td><td><span class="mv-type" style="background:'+col+'">'+tEs+'</span></td>'+
       '<td>'+(m.power!=null?m.power:'—')+'</td><td>'+(m.accuracy!=null?m.accuracy+'%':'—')+'</td><td>'+(m.pp!=null?m.pp:'—')+'</td></tr>'; }).join('');
@@ -1757,7 +1711,6 @@ async function renderWiki(name){
   }));
 }
 
-// Chips rápidos + buscador de la wiki
 (function initWiki(){
   const chips=document.getElementById('wiki-chips');
   if(chips){ WIKI_QUICK.forEach(n=>{ const b=document.createElement('button'); b.className='chip'; b.textContent=n;
@@ -1768,8 +1721,7 @@ async function renderWiki(name){
     q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ clearTimeout(t); const v=e.target.value.trim(); if(v)renderWiki(v); } });
   }
 })();
-// ===== COBBLEMON — buscador de Pokémon estilo tarjetas (usa PokéAPI + capa Cobblemon) =====
-// Datos de spawn/bioma curados para Cobblemon (se superponen a PokéAPI). Ampliable.
+
 const COB_SPAWN = {
   charmander:{biomes:['Cuevas','Zonas rocosas cálidas','cerca del Nether'],time:'Día',bucket:'uncommon'},
   bulbasaur:{biomes:['Jungla','Bosque frondoso'],time:'Día',bucket:'uncommon'},
@@ -1788,9 +1740,8 @@ const COB_SPAWN = {
 };
 const COB_BUCKET_ES={common:'Común',uncommon:'Poco común',rare:'Raro','ultra-rare':'Ultra raro'};
 const COB_QUICK=['Charmander','Pikachu','Eevee','Gastly','Snorlax','Toxtricity'];
-const cobCache={}; // cache de resultados por slug
+const cobCache={};
 
-// normaliza a slug PokéAPI (quita acentos, sufijos TCG, formas)
 function cobSlug(name){ let n=(name||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   n=n.replace(/\b(ex|gx|v|vmax|vstar|mega|radiante|radiant)\b/g,' ').replace(/[^a-z0-9\s-]/g,' ').replace(/\s+/g,' ').trim();
   return n.split(' ')[0]||''; }
@@ -1828,7 +1779,7 @@ function cobCardHTML(d, spawn){
     ? '<div class="mrow"><span class="lbl">🗺️ Biomas</span><span>'+spawn.biomes.join(', ')+'</span></div>'+
       '<div class="mrow"><span class="lbl">🕒 Horario</span><span>'+spawn.time+'</span></div>'+
       '<div class="mrow"><span class="lbl">🎲 Rareza</span><span>'+(COB_BUCKET_ES[spawn.bucket]||spawn.bucket)+'</span></div>'
-    : '<div class="mrow"><span class="lbl">🗺️ Spawn</span><span style="color:var(--muted)">Sin datos curados · revisa la wiki del mod/addon</span></div>';
+    : '<div class="mrow"><span class="lbl">🗺️ Spawn</span><span style="color:var(--muted)">Sin datos curados · revisa la wiki del mod</span></div>';
   const evoHTML = d.evo.length>1 ? '<div class="mrow"><span class="lbl">🧬 Evolución</span><span style="text-transform:capitalize">'+d.evo.join(' → ')+'</span></div>' : '';
   return '<div class="cmp-col" style="max-width:520px;margin:0 auto">'+
     '<div class="poke-top">'+(spr?'<img class="poke-sprite" src="'+spr+'" alt="'+d.esName+'">':'')+
@@ -1852,16 +1803,16 @@ async function renderCobblemon(force){
     COB_QUICK.forEach(n=>{ const b=document.createElement('button'); b.className='chip'; b.textContent=n;
       b.addEventListener('click',()=>{ document.getElementById('cob-q').value=n; doCobSearch(n); }); chips.appendChild(b); }); }
   if(!box.dataset.init){ box.dataset.init='1';
-    box.innerHTML='<div class="checklist-note"><b>¿Qué es Cobblemon?</b> Mod gratuito y open-source que añade Pokémon a Minecraft. Busca cualquier Pokémon para ver sus datos (tipos, stats, evolución) y dónde aparece. Funciona con los 1000+ oficiales; los Pokémon de addons de terceros salen si existen en PokéAPI, y si no, te avisa.</div>'+
+    box.innerHTML='<div class="checklist-note"><b>¿Qué es Cobblemon?</b> Mod gratuito y open-source que añade Pokémon a Minecraft. Busca cualquier Pokémon para ver sus datos y dónde aparece.</div>'+
       '<div class="empty">Escribe o toca un Pokémon 👆</div>'; }
 }
 async function doCobSearch(name){
   const box=document.getElementById('cob-content'); if(!box) return;
-  const note='<div class="checklist-note"><b>Cobblemon:</b> datos del Pokémon + spawn en el mod. Los Pokémon de addons de terceros salen si existen en PokéAPI.</div>';
-  if(!LIVE){ box.innerHTML=note+'<div class="empty">Cobblemon necesita conexión en vivo. Ábrelo fuera de Dia.</div>'; return; }
+  const note='<div class="checklist-note"><b>Cobblemon:</b> datos del Pokémon + spawn en el mod.</div>';
+  if(!LIVE){ box.innerHTML=note+'<div class="empty">Cobblemon necesita conexión en vivo.</div>'; return; }
   box.innerHTML=note+'<div class="loading"><div class="spinner"></div>Buscando '+name+'…</div>';
   const d=await cobFetch(name);
-  if(!d){ box.innerHTML=note+'<div class="empty">No encontré "'+name+'" en PokéAPI. Si es un Pokémon de un addon de terceros que no está en PokéAPI, no tengo sus datos — pero en tu juego funcionará igual si el addon lo incluye.</div>'; return; }
+  if(!d){ box.innerHTML=note+'<div class="empty">No encontré "'+name+'" en PokéAPI.</div>'; return; }
   const spawn=COB_SPAWN[d.slug];
   box.innerHTML=note+cobCardHTML(d, spawn);
 }
@@ -1869,14 +1820,13 @@ async function doCobSearch(name){
   if(q){ q.addEventListener('input',e=>{ clearTimeout(cobTimer); const v=e.target.value.trim(); if(v.length<3)return; cobTimer=setTimeout(()=>doCobSearch(v),400); });
     q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ clearTimeout(cobTimer); const v=e.target.value.trim(); if(v)doCobSearch(v); } }); }
 })();
-// ===== GROOVE de fondo (Web Audio, sintetizado, sin archivos, volumen bajo) =====
+
 (function(){
   const btn=document.getElementById('dj-btn'); if(!btn) return;
   let ctx=null, master=null, timer=null, step=0, playing=false;
-  const BPM=112, stepDur=60/BPM/4; // semicorcheas
-  // bajo funky (dórico en La): notas MIDI aproximadas por Hz
+  const BPM=112, stepDur=60/BPM/4;
   const bass=[110.00,0,164.81,110.00, 0,146.83,110.00,0, 130.81,0,110.00,98.00, 0,110.00,0,123.47];
-  const stab=[220.0,277.18,329.63]; // acorde para el "chá" disco
+  const stab=[220.0,277.18,329.63];
   function tone(freq,t,dur,type,gain,glideTo){
     const o=ctx.createOscillator(), g=ctx.createGain();
     o.type=type||'sawtooth'; o.frequency.setValueAtTime(freq,t);
@@ -1897,16 +1847,16 @@ async function doCobSearch(name){
     b.connect(hp); hp.connect(g); g.connect(master); b.start(t); }
   function tick(){
     const t=ctx.currentTime+0.03; const s=step%16;
-    if(s%4===0) kick(t);                       // four-on-the-floor
-    hat(t, s%4===2);                            // hats, open en el "y"
+    if(s%4===0) kick(t);
+    hat(t, s%4===2);
     const bn=bass[s]; if(bn) tone(bn,t,stepDur*0.9,'sawtooth',0.16, bn*1.001);
-    if(s===4||s===12){ stab.forEach(f=>tone(f,t,0.18,'square',0.05)); } // stab disco
+    if(s===4||s===12){ stab.forEach(f=>tone(f,t,0.18,'square',0.05)); }
     step++;
   }
   function start(){ if(playing) return;
     ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
     if(ctx.state==='suspended') ctx.resume();
-    master=master||(function(){ const m=ctx.createGain(); m.gain.value=0.22; // volumen BAJO
+    master=master||(function(){ const m=ctx.createGain(); m.gain.value=0.22;
       const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=6500; m.connect(lp); lp.connect(ctx.destination); return m; })();
     step=0; timer=setInterval(tick, stepDur*1000); playing=true;
     btn.textContent='🎧 Groove ON'; btn.classList.add('playing');
@@ -1915,6 +1865,7 @@ async function doCobSearch(name){
     btn.textContent='🎧 Groove OFF'; btn.classList.remove('playing'); }
   btn.addEventListener('click',()=> playing?stop():start());
 })();
+
 refreshStats(); paintBanner();
 probe().then(()=>{ Object.values(store.get()).forEach(c=>fetchPrice(c.id,c.name).then(refreshStats)); });
 </script>
